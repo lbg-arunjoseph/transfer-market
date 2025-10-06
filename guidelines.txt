@@ -337,3 +337,45 @@ INSERT INTO Club(id, name, budget) VALUES (2, 'Bristol Rovers 2.0', 45000000.00)
 INSERT INTO Player(id, name, price, club_id) VALUES (1, 'Luis Bento', 30000000.00, 1);
 INSERT INTO Player(id, name, price, club_id) VALUES (2, 'Marco Silva', 60000000.00, 1);
 
+########################################################################################
+
+
+➜  transfer-market git:(main) ✗ ./gradlew quarkusDev
+
+> Task :compileJava FAILED
+/Users/arun-joy.joseph/IdeaProjects/transfer-market/src/main/java/org/acme/ClubResource.java:28: error: incompatible types: no instance(s) of type variable(s) X exist so that PanacheEntityBase conforms to Club
+                .orElseThrow(() -> new NotFoundException("Club not found: " + id));
+                            ^
+  where X,T are type-variables:
+    X extends Throwable declared in method <X>orElseThrow(Supplier<? extends X>)
+    T extends Object declared in class Optional
+1 error
+
+[Incubating] Problems report is available at: file:///Users/arun-joy.joseph/IdeaProjects/transfer-market/build/reports/problems/problems-report.html
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':compileJava'.
+> Compilation failed; see the compiler output below.
+  /Users/arun-joy.joseph/IdeaProjects/transfer-market/src/main/java/org/acme/ClubResource.java:28: error: incompatible types: no instance(s) of type variable(s) X exist so that PanacheEntityBase conforms to Club
+                  .orElseThrow(() -> new NotFoundException("Club not found: " + id));
+                              ^
+    where X,T are type-variables:
+      X extends Throwable declared in method <X>orElseThrow(Supplier<? extends X>)
+      T extends Object declared in class Optional
+  1 error
+
+* Try:
+> Check your code and dependencies to fix the compilation error(s)
+> Run with --scan to generate a Build Scan (Powered by Develocity).
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.1.0/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD FAILED in 2m 2s
+6 actionable tasks: 1 executed, 5 up-to-date
+
