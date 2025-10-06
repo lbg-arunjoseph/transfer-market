@@ -1,0 +1,159 @@
+===== /Users/arun-joy.joseph/IdeaProjects/transfer-market/src/main/java/org/acme/dto/CreatePlayerRequest.java =====
+package org.acme.dto; // package groups related classes
+
+import java.math.BigDecimal;
+
+public class CreatePlayerRequest {         // maps incoming JSON when creating a player
+    public String name;                    // player name
+    public BigDecimal price;               // asking price
+    public Long clubId;                    // which club owns him initially
+}
+
+===== /Users/arun-joy.joseph/IdeaProjects/transfer-market/src/main/java/org/acme/dto/CreateClubRequest.java =====
+package org.acme.dto; // package groups related classes
+
+import java.math.BigDecimal;               // keep money precise
+
+public class CreateClubRequest {           // maps incoming JSON when creating a club
+    public String name;                    // club name
+    public BigDecimal budget;              // starting budget
+}
+===== /Users/arun-joy.joseph/IdeaProjects/transfer-market/src/main/java/org/acme/dto/TransferRequest.java =====
+package org.acme.dto;
+
+public class TransferRequest {             // maps the transfer command
+    public Long buyerClubId;               // club that wants to buy
+    public Long playerId;                  // player being bought
+}
+===== /Users/arun-joy.joseph/IdeaProjects/transfer-market/src/main/java/org/acme/dto/TransferResult.java =====
+package org.acme.dto;
+
+import java.math.BigDecimal;
+
+public class TransferResult {              // a friendly response after a transfer
+    public Long playerId;
+    public String playerName;
+    public String fromClub;
+    public String toClub;
+    public BigDecimal price;
+    public BigDecimal buyerBudgetAfter;
+    public BigDecimal sellerBudgetAfter;
+}
+===== /Users/arun-joy.joseph/IdeaProjects/transfer-market/src/main/java/org/acme/ClubResource.java =====
+package org.acme;
+
+import org.acme.dto.CreateClubRequest;                      // DTO for POST
+import io.smallrye.common.annotation.Blocking;                          // mark blocking endpoints (JPA is blocking)
+import jakarta.transaction.Transactional;                                // for DB writes
+import jakarta.ws.rs.*;                                                  // JAX-RS annotations
+import jakarta.ws.rs.core.MediaType;                                     // content types
+import jakarta.ws.rs.core.Response;                                      // HTTP response wrapper
+import java.math.BigDecimal;                                             // validation for budget
+import java.util.List;                                                   // list for GET all
+import java.util.Optional;                                               // for findByIdOptional
+
+@Path("/clubs")                                                          // base path for club API
+@Consumes(MediaType.APPLICATION_JSON)                                    // accept JSON
+@Produces(MediaType.APPLICATION_JSON)                                    // return JSON
+@Blocking                                                                 // ensure handled on worker thread (JPA)
+public class ClubResource {
+
+    @GET                                                                 // GET /clubs
+    public List<Club> list() {                                           // list all clubs
+        return Club.listAll();                                           // Panache helper -> SELECT * FROM Club
+    }
+
+    @GET
+    @Path("/{id}")                                                       // GET /clubs/{id}
+    public Club get(@PathParam("id") Long id) {                          // read one club
+        return Club.findByIdOptional(id)                                 // returns Optional<Club>
+                .orElseThrow(() -> new NotFoundException("Club not found: " + id));
+    }
+
+    @POST                                                                // POST /clubs
+    @Transactional                                                       // wrap in transaction for DB write
+    public Response create(CreateClubRequest req) {                      // JSON request body mapped to DTO
+        if (req == null || req.name == null || req.name.isBlank())
+            throw new BadRequestException("name is required");
+        if (req.budget == null || req.budget.compareTo(BigDecimal.ZERO) < 0)
+            throw new BadRequestException("budget must be >= 0");
+
+        Club c = new Club();                                             // new entity
+        c.name = req.name.trim();                                        // set name
+        c.budget = req.budget;                                           // set budget
+        c.persist();                                                     // INSERT into DB
+
+        return Response                                                  // HTTP 201 + created entity
+                .status(Response.Status.CREATED)
+                .entity(c)
+                .build();
+    }
+}
+===== /Users/arun-joy.joseph/IdeaProjects/transfer-market/src/main/java/org/acme/GreetingResource.java =====
+package org.acme;
+
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.core.MediaType;
+
+@Path("/hello")
+public class GreetingResource {
+
+    @GET
+    @Produces(MediaType.TEXT_PLAIN)
+    public String hello() {
+        return "Hello from REST";
+    }
+}
+
+===== /Users/arun-joy.joseph/IdeaProjects/transfer-market/src/main/java/org/acme/Player.java =====
+package org.acme; // package groups related classes
+
+import com.fasterxml.jackson.annotation.JsonIgnore;           // to avoid infinite JSON loops with bidirectional links
+import com.fasterxml.jackson.annotation.JsonProperty;         // to expose computed fields
+import io.quarkus.hibernate.orm.panache.PanacheEntity;        // Panache base
+import jakarta.persistence.*;                                 // JPA
+import java.math.BigDecimal;                                  // money
+
+@Entity                                                      // This becomes a table 'Player'
+public class Player extends PanacheEntity {                   // id (Long) provided by PanacheEntity
+
+    @Column(nullable = false)                                 // must have a name
+    public String name;
+
+    @Column(nullable = false, precision = 19, scale = 2)      // price (e.g., 74300000.00)
+    public BigDecimal price;
+
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)      // many players belong to a single club
+    @JoinColumn(name = "club_id")                             // FK column in Player table
+    @JsonIgnore                                               // hide to prevent recursion when serialising JSON
+    public Club club;
+
+    @JsonProperty("clubId")                                   // expose 'clubId' in JSON while keeping 'club' ignored
+    public Long jsonClubId() {
+        return club == null ? null : club.id;                 // compute club id for clients
+    }
+}
+===== /Users/arun-joy.joseph/IdeaProjects/transfer-market/src/main/java/org/acme/Club.java =====
+package org.acme; // package groups related classes
+
+import io.quarkus.hibernate.orm.panache.PanacheEntity;       // Panache base entity (id + helpers)
+import jakarta.persistence.*;                                // JPA annotations
+import java.math.BigDecimal;                                 // precise money type
+import java.util.List;                                       // list for players
+
+@Entity                                                      // Marks this as a JPA entity (mapped to a table)
+public class Club extends PanacheEntity {                    // Extends PanacheEntity => gets a Long id and helpers
+
+    @Column(nullable = false, unique = true)                 // name must be present and unique across clubs
+    public String name;
+
+    @Column(nullable = false, precision = 19, scale = 2)     // money as DECIMAL(19,2)
+    public BigDecimal budget;
+
+    @OneToMany(mappedBy = "club",                            // players reference their club; 'club' is the owner side
+            cascade = CascadeType.ALL,                    // propagate saves/deletes to players
+            orphanRemoval = true)                         // remove players if they’re de-linked (not used here, but safe)
+    public List<Player> players;                             // list of players for this club
+}
