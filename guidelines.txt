@@ -1,0 +1,339 @@
+src/main/resources/application.properties
+
+# --- Database: H2 in-memory. Creates a fresh DB per run (useful for learning/testing)
+quarkus.datasource.db-kind=h2
+quarkus.datasource.jdbc.url=jdbc:h2:mem:transferdb;DB_CLOSE_DELAY=-1
+quarkus.datasource.username=sa
+quarkus.datasource.password=sa
+
+# --- Hibernate ORM: auto-create schema each run (drop-and-create is great for a tutorial)
+quarkus.hibernate-orm.database.generation=drop-and-create
+quarkus.hibernate-orm.log.sql=true
+quarkus.hibernate-orm.format-sql=true
+
+# --- HTTP server bits
+quarkus.http.port=8080
+quarkus.http.cors=true
+
+
+
+
+src/main/java/com/example/transfer/Club.java
+
+package com.example.transfer;                                // package groups related classes
+
+import io.quarkus.hibernate.orm.panache.PanacheEntity;       // Panache base entity (id + helpers)
+import jakarta.persistence.*;                                // JPA annotations
+import java.math.BigDecimal;                                 // precise money type
+import java.util.List;                                       // list for players
+
+@Entity                                                      // Marks this as a JPA entity (mapped to a table)
+public class Club extends PanacheEntity {                    // Extends PanacheEntity => gets a Long id and helpers
+
+    @Column(nullable = false, unique = true)                 // name must be present and unique across clubs
+    public String name;
+
+    @Column(nullable = false, precision = 19, scale = 2)     // money as DECIMAL(19,2)
+    public BigDecimal budget;
+
+    @OneToMany(mappedBy = "club",                            // players reference their club; 'club' is the owner side
+               cascade = CascadeType.ALL,                    // propagate saves/deletes to players
+               orphanRemoval = true)                         // remove players if they’re de-linked (not used here, but safe)
+    public List<Player> players;                             // list of players for this club
+}
+
+
+src/main/java/com/example/transfer/Player.java
+
+package com.example.transfer;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;           // to avoid infinite JSON loops with bidirectional links
+import com.fasterxml.jackson.annotation.JsonProperty;         // to expose computed fields
+import io.quarkus.hibernate.orm.panache.PanacheEntity;        // Panache base
+import jakarta.persistence.*;                                 // JPA
+import java.math.BigDecimal;                                  // money
+
+@Entity                                                      // This becomes a table 'Player'
+public class Player extends PanacheEntity {                   // id (Long) provided by PanacheEntity
+
+    @Column(nullable = false)                                 // must have a name
+    public String name;
+
+    @Column(nullable = false, precision = 19, scale = 2)      // price (e.g., 74300000.00)
+    public BigDecimal price;
+
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)      // many players belong to a single club
+    @JoinColumn(name = "club_id")                             // FK column in Player table
+    @JsonIgnore                                               // hide to prevent recursion when serialising JSON
+    public Club club;
+
+    @JsonProperty("clubId")                                   // expose 'clubId' in JSON while keeping 'club' ignored
+    public Long jsonClubId() {
+        return club == null ? null : club.id;                 // compute club id for clients
+    }
+}
+
+
+
+src/main/java/com/example/transfer/dto/CreateClubRequest.java:
+
+package com.example.transfer.dto;
+
+import java.math.BigDecimal;               // keep money precise
+
+public class CreateClubRequest {           // maps incoming JSON when creating a club
+    public String name;                    // club name
+    public BigDecimal budget;              // starting budget
+}
+
+
+
+src/main/java/com/example/transfer/dto/CreatePlayerRequest.java:
+
+package com.example.transfer.dto;
+
+import java.math.BigDecimal;
+
+public class CreatePlayerRequest {         // maps incoming JSON when creating a player
+    public String name;                    // player name
+    public BigDecimal price;               // asking price
+    public Long clubId;                    // which club owns him initially
+}
+
+
+src/main/java/com/example/transfer/dto/TransferRequest.java:
+
+package com.example.transfer.dto;
+
+public class TransferRequest {             // maps the transfer command
+    public Long buyerClubId;               // club that wants to buy
+    public Long playerId;                  // player being bought
+}
+
+
+src/main/java/com/example/transfer/dto/TransferResult.java:
+
+package com.example.transfer.dto;
+
+import java.math.BigDecimal;
+
+public class TransferResult {              // a friendly response after a transfer
+    public Long playerId;
+    public String playerName;
+    public String fromClub;
+    public String toClub;
+    public BigDecimal price;
+    public BigDecimal buyerBudgetAfter;
+    public BigDecimal sellerBudgetAfter;
+}
+
+
+src/main/java/com/example/transfer/ClubResource.java;
+
+package com.example.transfer;
+
+import com.example.transfer.dto.CreateClubRequest;                      // DTO for POST
+import io.smallrye.common.annotation.Blocking;                          // mark blocking endpoints (JPA is blocking)
+import jakarta.transaction.Transactional;                                // for DB writes
+import jakarta.ws.rs.*;                                                  // JAX-RS annotations
+import jakarta.ws.rs.core.MediaType;                                     // content types
+import jakarta.ws.rs.core.Response;                                      // HTTP response wrapper
+import java.math.BigDecimal;                                             // validation for budget
+import java.util.List;                                                   // list for GET all
+import java.util.Optional;                                               // for findByIdOptional
+
+@Path("/clubs")                                                          // base path for club API
+@Consumes(MediaType.APPLICATION_JSON)                                    // accept JSON
+@Produces(MediaType.APPLICATION_JSON)                                    // return JSON
+@Blocking                                                                 // ensure handled on worker thread (JPA)
+public class ClubResource {
+
+    @GET                                                                 // GET /clubs
+    public List<Club> list() {                                           // list all clubs
+        return Club.listAll();                                           // Panache helper -> SELECT * FROM Club
+    }
+
+    @GET
+    @Path("/{id}")                                                       // GET /clubs/{id}
+    public Club get(@PathParam("id") Long id) {                          // read one club
+        return Club.findByIdOptional(id)                                 // returns Optional<Club>
+                .orElseThrow(() -> new NotFoundException("Club not found: " + id));
+    }
+
+    @POST                                                                // POST /clubs
+    @Transactional                                                       // wrap in transaction for DB write
+    public Response create(CreateClubRequest req) {                      // JSON request body mapped to DTO
+        if (req == null || req.name == null || req.name.isBlank())
+            throw new BadRequestException("name is required");
+        if (req.budget == null || req.budget.compareTo(BigDecimal.ZERO) < 0)
+            throw new BadRequestException("budget must be >= 0");
+
+        Club c = new Club();                                             // new entity
+        c.name = req.name.trim();                                        // set name
+        c.budget = req.budget;                                           // set budget
+        c.persist();                                                     // INSERT into DB
+
+        return Response                                                  // HTTP 201 + created entity
+                .status(Response.Status.CREATED)
+                .entity(c)
+                .build();
+    }
+}
+
+
+
+src/main/java/com/example/transfer/PlayerResource.java:
+
+package com.example.transfer;
+
+import com.example.transfer.dto.CreatePlayerRequest;                      // DTO for POST
+import io.smallrye.common.annotation.Blocking;                           // blocking (JPA)
+import jakarta.transaction.Transactional;                                 // DB write boundary
+import jakarta.ws.rs.*;                                                   // JAX-RS
+import jakarta.ws.rs.core.MediaType;                                      // JSON content-type
+import jakarta.ws.rs.core.Response;                                       // HTTP responses
+import java.math.BigDecimal;                                              // for price checks
+import java.util.List;                                                    // list endpoint
+
+@Path("/players")                                                         // base path for player API
+@Consumes(MediaType.APPLICATION_JSON)
+@Produces(MediaType.APPLICATION_JSON)
+@Blocking
+public class PlayerResource {
+
+    @GET                                                                  // GET /players
+    public List<Player> list() {
+        return Player.listAll();                                          // SELECT * FROM Player
+    }
+
+    @GET
+    @Path("/{id}")                                                        // GET /players/{id}
+    public Player get(@PathParam("id") Long id) {
+        return Player.findByIdOptional(id)
+                .orElseThrow(() -> new NotFoundException("Player not found: " + id));
+    }
+
+    @POST                                                                 // POST /players
+    @Transactional
+    public Response create(CreatePlayerRequest req) {
+        if (req == null || req.name == null || req.name.isBlank())
+            throw new BadRequestException("name is required");
+        if (req.price == null || req.price.compareTo(BigDecimal.ZERO) < 0)
+            throw new BadRequestException("price must be >= 0");
+        if (req.clubId == null)
+            throw new BadRequestException("clubId is required");
+
+        Club club = Club.findByIdOptional(req.clubId)                     // resolve owning club
+                .orElseThrow(() -> new NotFoundException("clubId not found: " + req.clubId));
+
+        Player p = new Player();                                          // new player
+        p.name = req.name.trim();                                         // set fields
+        p.price = req.price;
+        p.club = club;                                                    // link to owner club
+        p.persist();                                                      // INSERT
+
+        return Response.status(Response.Status.CREATED).entity(p).build();// return 201
+    }
+}
+
+
+
+src/main/java/com/example/transfer/TransferService.java:
+
+package com.example.transfer;
+
+import com.example.transfer.dto.TransferResult;                 // response DTO
+import jakarta.enterprise.context.ApplicationScoped;            // CDI bean (one per app)
+import jakarta.transaction.Transactional;                       // wrap transfer in a transaction
+import jakarta.ws.rs.BadRequestException;                       // 400 on invalid request
+import jakarta.ws.rs.NotFoundException;                         // 404 when entity missing
+import java.math.BigDecimal;                                    // money operations
+
+@ApplicationScoped                                               // managed bean
+public class TransferService {
+
+    @Transactional                                              // all DB changes happen atomically
+    public TransferResult transfer(Long buyerClubId, Long playerId) {
+        if (buyerClubId == null || playerId == null)
+            throw new BadRequestException("buyerClubId and playerId are required");
+
+        Club buyer = Club.findByIdOptional(buyerClubId)         // fetch buyer
+                .orElseThrow(() -> new NotFoundException("Buyer club not found: " + buyerClubId));
+
+        Player player = Player.findByIdOptional(playerId)       // fetch player
+                .orElseThrow(() -> new NotFoundException("Player not found: " + playerId));
+
+        Club seller = player.club;                              // current owner
+        if (seller == null)
+            throw new BadRequestException("Player has no current club");
+        if (seller.id.equals(buyer.id))
+            throw new BadRequestException("Buyer already owns this player");
+
+        BigDecimal price = player.price;                        // agreed price
+        if (buyer.budget.compareTo(price) < 0)                  // can buyer afford?
+            throw new BadRequestException("Buyer cannot afford this player");
+
+        // Money moves: buyer pays, seller receives
+        buyer.budget = buyer.budget.subtract(price);            // deduct from buyer
+        seller.budget = seller.budget.add(price);               // add to seller
+
+        // Transfer registration
+        player.club = buyer;                                    // change ownership
+
+        // No explicit persist() needed: entities are managed in a transaction.
+
+        // Build a friendly result payload
+        TransferResult result = new TransferResult();
+        result.playerId = player.id;
+        result.playerName = player.name;
+        result.fromClub = seller.name;
+        result.toClub = buyer.name;
+        result.price = price;
+        result.buyerBudgetAfter = buyer.budget;
+        result.sellerBudgetAfter = seller.budget;
+
+        return result;                                          // returned as JSON by resource
+    }
+}
+
+
+
+src/main/java/com/example/transfer/TransferResource.java:
+
+package com.example.transfer;
+
+import com.example.transfer.dto.TransferRequest;                 // input DTO
+import com.example.transfer.dto.TransferResult;                  // output DTO
+import io.smallrye.common.annotation.Blocking;                   // JPA is blocking
+import jakarta.inject.Inject;                                    // DI for service
+import jakarta.ws.rs.*;                                          // JAX-RS annotations
+import jakarta.ws.rs.core.MediaType;                             // JSON
+import jakarta.ws.rs.core.Response;                              // HTTP responses
+
+@Path("/transfers")                                              // base path for transfers
+@Consumes(MediaType.APPLICATION_JSON)
+@Produces(MediaType.APPLICATION_JSON)
+@Blocking
+public class TransferResource {
+
+    @Inject                                                      // inject our business service
+    TransferService service;
+
+    @POST                                                        // POST /transfers
+    public Response transfer(TransferRequest req) {              // JSON -> DTO
+        TransferResult result = service.transfer(req.buyerClubId, req.playerId);  // do it
+        return Response.ok(result).build();                      // 200 with result JSON
+    }
+}
+
+
+src/main/resources/import.sql:
+
+-- Clubs
+INSERT INTO Club(id, name, budget) VALUES (1, 'Arandale FC', 100000000.00);
+INSERT INTO Club(id, name, budget) VALUES (2, 'Bristol Rovers 2.0', 45000000.00);
+
+-- Players
+INSERT INTO Player(id, name, price, club_id) VALUES (1, 'Luis Bento', 30000000.00, 1);
+INSERT INTO Player(id, name, price, club_id) VALUES (2, 'Marco Silva', 60000000.00, 1);
+
