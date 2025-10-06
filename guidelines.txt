@@ -380,19 +380,16 @@ BUILD FAILED in 2m 2s
 6 actionable tasks: 1 executed, 5 up-to-date
 
 
-# List (empty)
-curl -s http://localhost:8080/clubs | jq
-
-# Create two clubs
-curl -s -X POST http://localhost:8080/clubs \
+# Create a player for Arandale FC (assume Arandale has id 1; adjust if different)
+curl -s -X POST http://localhost:8080/players \
   -H 'Content-Type: application/json' \
-  -d '{"name":"Arandale FC","budget":100000000}' | jq
+  -d '{"name":"Luis Bento","price":30000000,"clubId":1}' | jq
 
-curl -s -X POST http://localhost:8080/clubs \
+# Create another player
+curl -s -X POST http://localhost:8080/players \
   -H 'Content-Type: application/json' \
-  -d '{"name":"Bristol Rovers 2.0","budget":45000000}' | jq
+  -d '{"name":"Marco Silva","price":50000000,"clubId":1}' | jq
 
-# List again
-curl -s http://localhost:8080/clubs | jq
-
+# List players (note: each JSON has "clubId" but not the nested club object)
+curl -s http://localhost:8080/players | jq
 
