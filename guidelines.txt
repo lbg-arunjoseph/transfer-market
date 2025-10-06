@@ -379,3 +379,20 @@ For more on this, please refer to https://docs.gradle.org/9.1.0/userguide/comman
 BUILD FAILED in 2m 2s
 6 actionable tasks: 1 executed, 5 up-to-date
 
+
+# List (empty)
+curl -s http://localhost:8080/clubs | jq
+
+# Create two clubs
+curl -s -X POST http://localhost:8080/clubs \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"Arandale FC","budget":100000000}' | jq
+
+curl -s -X POST http://localhost:8080/clubs \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"Bristol Rovers 2.0","budget":45000000}' | jq
+
+# List again
+curl -s http://localhost:8080/clubs | jq
+
+
