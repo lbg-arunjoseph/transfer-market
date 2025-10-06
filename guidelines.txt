@@ -393,3 +393,47 @@ curl -s -X POST http://localhost:8080/players \
 # List players (note: each JSON has "clubId" but not the nested club object)
 curl -s http://localhost:8080/players | jq
 
+
+
+
+
+# 1) Create two clubs
+curl -s -X POST http://localhost:8080/clubs -H 'Content-Type: application/json' \
+  -d '{"name":"Arandale FC","budget":100000000}' | jq
+
+curl -s -X POST http://localhost:8080/clubs -H 'Content-Type: application/json' \
+  -d '{"name":"Bristol Rovers 2.0","budget":45000000}' | jq
+
+# Confirm their IDs (note them)
+curl -s http://localhost:8080/clubs | jq
+
+# Suppose Arandale id=1, Bristol id=2 (adjust if different)
+
+# 2) Create a player owned by Arandale
+curl -s -X POST http://localhost:8080/players -H 'Content-Type: application/json' \
+  -d '{"name":"Luis Bento","price":30000000,"clubId":1}' | jq
+
+# Confirm player exists
+curl -s http://localhost:8080/players | jq
+
+# 3) Attempt transfer where buyer cannot afford (try lowering Bristol’s budget first if needed)
+# If Bristol has 45m, price is 30m — this WILL succeed; to test failure, try a 60m player or reduce budget.
+# Let's create a pricier player for a failure case:
+curl -s -X POST http://localhost:8080/players -H 'Content-Type: application/json' \
+  -d '{"name":"Marco Silva","price":60000000,"clubId":1}' | jq
+
+# Try to buy expensive player with Bristol (should fail: 400 Bad Request)
+curl -i -s -X POST http://localhost:8080/transfers -H 'Content-Type: application/json' \
+  -d '{"buyerClubId":2,"playerId":2}'
+
+# 4) Now buy the 30m player (should succeed)
+curl -s -X POST http://localhost:8080/transfers -H 'Content-Type: application/json' \
+  -d '{"buyerClubId":2,"playerId":1}' | jq
+
+# 5) Verify budgets changed: Bristol decreased by 30m; Arandale increased by 30m
+curl -s http://localhost:8080/clubs | jq
+
+# 6) Check player ownership moved (playerId=1 should show clubId=2 now)
+curl -s http://localhost:8080/players | jq
+
+
