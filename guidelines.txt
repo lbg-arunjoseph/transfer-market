@@ -1309,3 +1309,61 @@ class TransferResourceApiTest {
     }
 }
 
+
+➜  transfer-market git:(main) ✗ ./gradlew clean test --refresh-dependencies
+Starting a Gradle Daemon, 2 stopped Daemons could not be reused, use --status for details
+
+> Task :compileTestJava
+Note: Some input files use unchecked or unsafe operations.
+Note: Recompile with -Xlint:unchecked for details.
+Unrecognized configuration key "quarkus.http.cors" was provided; it will be ignored; verify that the dependency extension for this configuration is set or that you did not make a typo
+Unrecognized configuration key "quarkus.hibernate-orm.format-sql" was provided; it will be ignored; verify that the dependency extension for this configuration is set or that you did not make a typo
+The "quarkus.hibernate-orm.database.generation" config property is deprecated and should not be used anymore.
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+
+> Task :test
+
+ClubResourceApiTest > create_valid_payload_persists_and_returns_201() FAILED
+    org.mockito.exceptions.misusing.NotAMockException at ClubResourceApiTest.java:25
+
+ClubResourceApiTest > get_by_id_404_when_missing() FAILED
+    org.mockito.exceptions.misusing.NotAMockException at ClubResourceApiTest.java:25
+
+ClubResourceApiTest > list_returns_clubs_from_panache() FAILED
+    org.mockito.exceptions.misusing.NotAMockException at ClubResourceApiTest.java:25
+
+PlayerResourceApiTest > create_player_validates_clubId() FAILED
+    org.mockito.exceptions.misusing.NotAMockException at PlayerResourceApiTest.java:27
+
+PlayerResourceApiTest > list_players_uses_panache_listAll() FAILED
+    org.mockito.exceptions.misusing.NotAMockException at PlayerResourceApiTest.java:27
+
+PlayerResourceApiTest > get_player_404_when_missing() FAILED
+    org.mockito.exceptions.misusing.NotAMockException at PlayerResourceApiTest.java:27
+
+TransferServiceTest > success_moves_ownership_and_updates_budgets() FAILED
+    org.opentest4j.AssertionFailedError at TransferServiceTest.java:39
+
+12 tests completed, 7 failed
+
+> Task :test FAILED
+
+[Incubating] Problems report is available at: file:///Users/arun-joy.joseph/IdeaProjects/transfer-market/build/reports/problems/problems-report.html
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':test'.
+> There were failing tests. See the report at: file:///Users/arun-joy.joseph/IdeaProjects/transfer-market/build/reports/tests/test/index.html
+
+* Try:
+> Run with --scan to generate a Build Scan (Powered by Develocity).
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.1.0/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD FAILED in 3m 21s
+9 actionable tasks: 9 executed
