@@ -1196,5 +1196,60 @@ BUILD FAILED in 3m 50s
 9 actionable tasks: 9 executed
 
 
+➜  transfer-market git:(main) ✗ ./gradlew clean test --refresh-dependencies
+Starting a Gradle Daemon, 1 busy and 1 stopped Daemons could not be reused, use --status for details
+
+> Task :compileTestJava
+/Users/arun-joy.joseph/IdeaProjects/transfer-market/src/test/java/org/acme/api/TransferResourceApiTest.java:4: error: cannot find symbol
+import io.quarkus.test.junit.mockito.InjectMock;
+                                    ^
+  symbol:   class InjectMock
+  location: package io.quarkus.test.junit.mockito
+/Users/arun-joy.joseph/IdeaProjects/transfer-market/src/test/java/org/acme/api/TransferResourceApiTest.java:18: error: cannot find symbol
+    @InjectMock
+     ^
+  symbol:   class InjectMock
+  location: class TransferResourceApiTest
+Note: Some input files use unchecked or unsafe operations.
+Note: Recompile with -Xlint:unchecked for details.
+2 errors
+
+> Task :compileTestJava FAILED
+
+[Incubating] Problems report is available at: file:///Users/arun-joy.joseph/IdeaProjects/transfer-market/build/reports/problems/problems-report.html
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':compileTestJava'.
+> Compilation failed; see the compiler output below.
+  /Users/arun-joy.joseph/IdeaProjects/transfer-market/src/test/java/org/acme/api/TransferResourceApiTest.java:4: error: cannot find symbol
+  import io.quarkus.test.junit.mockito.InjectMock;
+                                      ^
+    symbol:   class InjectMock
+    location: package io.quarkus.test.junit.mockito
+  /Users/arun-joy.joseph/IdeaProjects/transfer-market/src/test/java/org/acme/api/TransferResourceApiTest.java:18: error: cannot find symbol
+      @InjectMock
+       ^
+    symbol:   class InjectMock
+    location: class TransferResourceApiTest
+  Note: Recompile with -Xlint:unchecked for details.
+  Note: Some input files use unchecked or unsafe operations.
+  2 errors
+
+* Try:
+> Check your code and dependencies to fix the compilation error(s)
+> Run with --scan to generate a Build Scan (Powered by Develocity).
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.1.0/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD FAILED in 3m 20s
+8 actionable tasks: 8 executed
+
+
 
 
