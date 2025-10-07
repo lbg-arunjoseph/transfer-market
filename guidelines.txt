@@ -475,3 +475,90 @@ BUILD FAILED in 2m 18s
 10 actionable tasks: 10 executed
 
 
+plugins {
+    id 'java'
+    id 'io.quarkus'
+}
+
+repositories {
+    mavenCentral()
+    mavenLocal()
+    maven {
+        url = "https://nexus.mgmt-bld.oncp.dev/repository/maven-public/"
+    }
+    maven {
+        url = "https://nexus.sbs-bld.oncp.dev/repository/sbs-pdt/"
+    }
+    maven {
+        url = "https://nexus.sbs-bld.oncp.dev/repository/shared-services/"
+    }
+}
+
+dependencies {
+    implementation enforcedPlatform("${quarkusPlatformGroupId}:${quarkusPlatformArtifactId}:${quarkusPlatformVersion}")
+//    implementation 'io.quarkus:quarkus-arc'
+    implementation 'io.quarkus:quarkus-rest'
+
+    implementation 'io.quarkus:quarkus-rest-jackson'
+    implementation 'io.quarkus:quarkus-hibernate-orm-panache'
+    implementation 'io.quarkus:quarkus-jdbc-h2'
+
+    testImplementation 'io.quarkus:quarkus-junit5'
+    testImplementation 'io.rest-assured:rest-assured'
+}
+
+group = 'org.acme'
+version = '1.0.0-SNAPSHOT'
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+}
+
+test {
+    systemProperty "java.util.logging.manager", "org.jboss.logmanager.LogManager"
+}
+compileJava {
+    options.encoding = 'UTF-8'
+    options.compilerArgs << '-parameters'
+}
+
+compileTestJava {
+    options.encoding = 'UTF-8'
+}
+
+
+
+gradle.properties:
+
+# Gradle properties
+
+quarkusPluginId=io.quarkus
+quarkusPluginVersion=3.28.2
+quarkusPlatformGroupId=io.quarkus.platform
+quarkusPlatformArtifactId=quarkus-bom
+quarkusPlatformVersion=3.28.2
+
+
+settings.gradle:
+
+pluginManagement {
+    repositories {
+        mavenCentral()
+        gradlePluginPortal()
+        mavenLocal()
+        maven {
+            url 'https://nexus.mgmt-bld.oncp.dev/repository/maven-public/'
+        }
+        maven {
+            url = "https://nexus.sbs-bld.oncp.dev/repository/sbs-pdt/"
+        }
+    }
+    plugins {
+        id "${quarkusPluginId}" version "${quarkusPluginVersion}"
+    }
+}
+rootProject.name='transfer-market'
+
+
+
