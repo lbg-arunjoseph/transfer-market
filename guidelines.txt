@@ -561,4 +561,25 @@ pluginManagement {
 rootProject.name='transfer-market'
 
 
+# CORS (new key name)
+quarkus.http.cors.enabled=true
+
+# Hibernate ORM — logging keys live under "log.*"
+quarkus.hibernate-orm.log.sql=true
+quarkus.hibernate-orm.log.format-sql=true
+
+# Schema generation (old key is deprecated)
+quarkus.hibernate-orm.schema.generation=drop-and-create
+
+# Keep your datasource as-is
+quarkus.datasource.db-kind=h2
+quarkus.datasource.jdbc.url=jdbc:h2:mem:transferdb;DB_CLOSE_DELAY=-1
+quarkus.datasource.username=sa
+quarkus.datasource.password=sa
+
+# Optional: seed file if you’re using it
+quarkus.hibernate-orm.sql-load-script=import.sql
+
+
+
 
