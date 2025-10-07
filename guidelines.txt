@@ -637,5 +637,16 @@ For more on this, please refer to https://docs.gradle.org/9.1.0/userguide/comman
 BUILD FAILED in 16s
 
 
+dependencies {
+  implementation enforcedPlatform("io.quarkus.platform:quarkus-bom:3.28.2")
+  implementation "io.quarkus:quarkus-rest"
+  implementation "io.quarkus:quarkus-rest-jackson"
+  implementation "io.quarkus:quarkus-hibernate-orm-panache"
+  implementation "io.quarkus:quarkus-jdbc-h2"
+  testImplementation "io.quarkus:quarkus-junit5"
+  testImplementation "io.rest-assured:rest-assured"
+}
+
+
 
 
