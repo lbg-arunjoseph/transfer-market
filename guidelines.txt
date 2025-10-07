@@ -1251,5 +1251,61 @@ BUILD FAILED in 3m 20s
 8 actionable tasks: 8 executed
 
 
+src/test/java/org/acme/api/TransferResourceApiTest.java:
 
+
+package org.acme.api;
+
+import io.quarkus.test.junit.QuarkusTest;
+import io.quarkus.test.junit.QuarkusMock;
+import io.restassured.http.ContentType;
+import org.acme.TransferService;
+import org.acme.dto.TransferResult;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
+
+import static io.restassured.RestAssured.given;
+import static org.hamcrest.Matchers.is;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.when;
+
+@QuarkusTest
+class TransferResourceApiTest {
+
+    @BeforeEach
+    void registerMock() {
+        // Create a Mockito mock and install it as the CDI bean
+        TransferService mock = Mockito.mock(TransferService.class);
+
+        TransferResult r = new TransferResult();
+        r.playerId = 1L; r.playerName = "Luis Bento";
+        r.fromClub = "Arandale FC"; r.toClub = "Bristol Rovers 2.0";
+        r.price = new java.math.BigDecimal("30000000");
+        r.buyerBudgetAfter = new java.math.BigDecimal("15000000");
+        r.sellerBudgetAfter = new java.math.BigDecimal("130000000");
+
+        when(mock.transfer(anyLong(), anyLong())).thenReturn(r);
+
+        // This line tells Quarkus: use `mock` whenever TransferService is injected
+        QuarkusMock.installMockForType(mock, TransferService.class);
+    }
+
+    @Test
+    void transfer_endpoint_returns_service_result() {
+        given()
+            .contentType(ContentType.JSON)
+            .body("""
+                  { "buyerClubId": 2, "playerId": 1 }
+                  """)
+        .when()
+            .post("/transfers")
+        .then()
+            .statusCode(200)
+            .contentType(ContentType.JSON)
+            .body("playerId", is(1))
+            .body("playerName", is("Luis Bento"))
+            .body("toClub", is("Bristol Rovers 2.0"));
+    }
+}
 
