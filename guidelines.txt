@@ -437,3 +437,41 @@ curl -s http://localhost:8080/clubs | jq
 curl -s http://localhost:8080/players | jq
 
 
+
+
+
+➜  transfer-market git:(main) ✗  ./gradlew clean build
+Unrecognized configuration key "quarkus.http.cors" was provided; it will be ignored; verify that the dependency extension for this configuration is set or that you did not make a typo
+Unrecognized configuration key "quarkus.hibernate-orm.format-sql" was provided; it will be ignored; verify that the dependency extension for this configuration is set or that you did not make a typo
+The "quarkus.hibernate-orm.database.generation" config property is deprecated and should not be used anymore.
+
+> Task :test
+
+GreetingResourceTest > testHelloEndpoint() FAILED
+    java.lang.AssertionError at GreetingResourceTest.java:17
+
+1 test completed, 1 failed
+
+> Task :test FAILED
+
+[Incubating] Problems report is available at: file:///Users/arun-joy.joseph/IdeaProjects/transfer-market/build/reports/problems/problems-report.html
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':test'.
+> There were failing tests. See the report at: file:///Users/arun-joy.joseph/IdeaProjects/transfer-market/build/reports/tests/test/index.html
+
+* Try:
+> Run with --scan to generate a Build Scan (Powered by Develocity).
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.1.0/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD FAILED in 2m 18s
+10 actionable tasks: 10 executed
+
+
