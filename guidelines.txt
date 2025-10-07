@@ -581,5 +581,33 @@ quarkus.datasource.password=sa
 quarkus.hibernate-orm.sql-load-script=import.sql
 
 
+➜  transfer-market git:(main) ✗  ./gradlew clean build
+
+[Incubating] Problems report is available at: file:///Users/arun-joy.joseph/IdeaProjects/transfer-market/build/reports/problems/problems-report.html
+
+FAILURE: Build failed with an exception.
+
+* Where:
+Settings file '/Users/arun-joy.joseph/IdeaProjects/transfer-market/settings.gradle' line: 14
+
+* What went wrong:
+A problem occurred evaluating settings 'transfer-market'.
+> Could not get unknown property 'quarkusPluginId' for object of type org.gradle.plugin.management.internal.DefaultPluginManagementSpec$PluginDependenciesSpecImpl.
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to generate a Build Scan (Powered by Develocity).
+> Get more help at https://help.gradle.org.
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.1.0/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD FAILED in 289ms
+
+
 
 
