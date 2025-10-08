@@ -2571,3 +2571,46 @@ For more on this, please refer to https://docs.gradle.org/9.1.0/userguide/comman
 BUILD FAILED in 2m 1s
 9 actionable tasks: 9 executed
 
+
+
+
+src/test/resources/application.properties:
+
+
+# H2 test datasource (same as main)
+quarkus.datasource.db-kind=h2
+quarkus.datasource.jdbc.url=jdbc:h2:mem:transferdb;DB_CLOSE_DELAY=-1
+quarkus.datasource.username=sa
+quarkus.datasource.password=sa
+
+# USE THE RECOGNIZED KEY in your Quarkus version
+quarkus.hibernate-orm.database.generation=drop-and-create
+
+# Do NOT run import.sql in tests (prevents PK collisions)
+quarkus.hibernate-orm.sql-load-script=no-file
+
+# Optional logs
+quarkus.hibernate-orm.log.sql=true
+quarkus.hibernate-orm.log.format-sql=true
+
+
+src/main/resources/application.properties:
+
+# CORS (current key)
+quarkus.http.cors.enabled=true
+
+# H2 datasource
+quarkus.datasource.db-kind=h2
+quarkus.datasource.jdbc.url=jdbc:h2:mem:transferdb;DB_CLOSE_DELAY=-1
+quarkus.datasource.username=sa
+quarkus.datasource.password=sa
+
+# DDL (use the key your version recognizes)
+quarkus.hibernate-orm.database.generation=drop-and-create
+
+# Logging keys
+quarkus.hibernate-orm.log.sql=true
+quarkus.hibernate-orm.log.format-sql=true
+
+# Seed in dev/main only (tests override it to 'no-file')
+quarkus.hibernate-orm.sql-load-script=import.sql
