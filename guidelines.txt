@@ -2186,3 +2186,25 @@ For more on this, please refer to https://docs.gradle.org/9.1.0/userguide/comman
 
 BUILD FAILED in 2m 8s
 9 actionable tasks: 9 executed
+
+
+
+
+
+# --- HTTP & DB ---
+quarkus.http.cors.enabled=true
+
+quarkus.datasource.db-kind=h2
+quarkus.datasource.jdbc.url=jdbc:h2:mem:transferdb;DB_CLOSE_DELAY=-1
+quarkus.datasource.username=sa
+quarkus.datasource.password=sa
+
+# --- Hibernate ORM (current keys) ---
+quarkus.hibernate-orm.schema.generation=drop-and-create
+quarkus.hibernate-orm.log.sql=true
+quarkus.hibernate-orm.log.format-sql=true
+
+# --- Seed only in dev/test-base, then turn it off in test profile ---
+quarkus.hibernate-orm.sql-load-script=import.sql
+%test.quarkus.hibernate-orm.sql-load-script=no-file
+
