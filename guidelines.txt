@@ -2208,3 +2208,205 @@ quarkus.hibernate-orm.log.format-sql=true
 quarkus.hibernate-orm.sql-load-script=import.sql
 %test.quarkus.hibernate-orm.sql-load-script=no-file
 
+
+
+➜  transfer-market git:(main) ✗ ./gradlew clean test
+Unrecognized configuration key "quarkus.http.cors" was provided; it will be ignored; verify that the dependency extension for this configuration is set or that you did not make a typo
+Unrecognized configuration key "quarkus.hibernate-orm.format-sql" was provided; it will be ignored; verify that the dependency extension for this configuration is set or that you did not make a typo
+The "quarkus.hibernate-orm.database.generation" config property is deprecated and should not be used anymore.
+HHH000247: ErrorCode: 23505, SQLState: 23505
+Unique index or primary key violation: "PRIMARY KEY ON PUBLIC.CLUB(ID) ( /* key:1 */ 100000000.00, CAST(1 AS BIGINT), 'Arandale FC')"; SQL statement:
+insert into Club (budget,name,id) values (?,?,?) [23505-230]
+ARJUNA012125: TwoPhaseCoordinator.beforeCompletion - failed for SynchronizationImple< 0:ffffc0a80168:e7ec:68e5adbe:1, org.hibernate.resource.transaction.backend.jta.internal.synchronization.RegisteredSynchronization@28b37d76 >
+org.hibernate.exception.ConstraintViolationException: could not execute statement [Unique index or primary key violation: "PRIMARY KEY ON PUBLIC.CLUB(ID) ( /* key:1 */ 100000000.00, CAST(1 AS BIGINT), 'Arandale FC')"; SQL statement:
+insert into Club (budget,name,id) values (?,?,?) [23505-230]] [insert into Club (budget,name,id) values (?,?,?)]
+        at org.hibernate.dialect.H2Dialect.lambda$buildSQLExceptionConversionDelegate$1(H2Dialect.java:845)
+        at org.hibernate.exception.internal.StandardSQLExceptionConverter.convert(StandardSQLExceptionConverter.java:34)
+        at org.hibernate.engine.jdbc.spi.SqlExceptionHelper.convert(SqlExceptionHelper.java:115)
+        at org.hibernate.engine.jdbc.internal.ResultSetReturnImpl.executeUpdate(ResultSetReturnImpl.java:193)
+        at org.hibernate.engine.jdbc.mutation.internal.AbstractMutationExecutor.performNonBatchedMutation(AbstractMutationExecutor.java:148)
+        at org.hibernate.engine.jdbc.mutation.internal.MutationExecutorSingleNonBatched.performNonBatchedOperations(MutationExecutorSingleNonBatched.java:53)
+        at org.hibernate.engine.jdbc.mutation.internal.AbstractMutationExecutor.execute(AbstractMutationExecutor.java:66)
+        at org.hibernate.engine.jdbc.mutation.internal.AbstractMutationExecutor.execute(AbstractMutationExecutor.java:55)
+        at org.hibernate.persister.entity.mutation.InsertCoordinatorStandard.doStaticInserts(InsertCoordinatorStandard.java:191)
+        at org.hibernate.persister.entity.mutation.InsertCoordinatorStandard.coordinateInsert(InsertCoordinatorStandard.java:129)
+        at org.hibernate.persister.entity.mutation.InsertCoordinatorStandard.insert(InsertCoordinatorStandard.java:101)
+        at org.hibernate.action.internal.EntityInsertAction.execute(EntityInsertAction.java:113)
+        at org.hibernate.engine.spi.ActionQueue.executeActions(ActionQueue.java:646)
+        at org.hibernate.engine.spi.ActionQueue.executeActions(ActionQueue.java:513)
+        at org.hibernate.event.internal.AbstractFlushingEventListener.performExecutions(AbstractFlushingEventListener.java:378)
+        at org.hibernate.event.internal.DefaultFlushEventListener.onFlush(DefaultFlushEventListener.java:39)
+        at org.hibernate.event.service.internal.EventListenerGroupImpl.fireEventOnEachListener(EventListenerGroupImpl.java:140)
+        at org.hibernate.internal.SessionImpl.doFlush(SessionImpl.java:1443)
+        at org.hibernate.internal.SessionImpl.managedFlush(SessionImpl.java:488)
+        at org.hibernate.internal.SessionImpl.flushBeforeTransactionCompletion(SessionImpl.java:2321)
+        at org.hibernate.internal.SessionImpl.beforeTransactionCompletion(SessionImpl.java:2029)
+        at org.hibernate.engine.jdbc.internal.JdbcCoordinatorImpl.beforeTransactionCompletion(JdbcCoordinatorImpl.java:394)
+        at org.hibernate.resource.transaction.backend.jta.internal.JtaTransactionCoordinatorImpl.beforeCompletion(JtaTransactionCoordinatorImpl.java:328)
+        at org.hibernate.resource.transaction.backend.jta.internal.synchronization.SynchronizationCallbackCoordinatorNonTrackingImpl.beforeCompletion(SynchronizationCallbackCoordinatorNonTrackingImpl.java:39)
+        at org.hibernate.resource.transaction.backend.jta.internal.synchronization.RegisteredSynchronization.beforeCompletion(RegisteredSynchronization.java:33)
+        at com.arjuna.ats.internal.jta.resources.arjunacore.SynchronizationImple.beforeCompletion(SynchronizationImple.java:52)
+        at com.arjuna.ats.arjuna.coordinator.TwoPhaseCoordinator.beforeCompletion(TwoPhaseCoordinator.java:348)
+        at com.arjuna.ats.arjuna.coordinator.TwoPhaseCoordinator.end(TwoPhaseCoordinator.java:66)
+        at com.arjuna.ats.arjuna.AtomicAction.commit(AtomicAction.java:135)
+        at com.arjuna.ats.internal.jta.transaction.arjunacore.TransactionImple.commitAndDisassociate(TransactionImple.java:1307)
+        at com.arjuna.ats.internal.jta.transaction.arjunacore.BaseTransaction.commit(BaseTransaction.java:104)
+        at io.quarkus.narayana.jta.runtime.NotifyingTransactionManager.commit(NotifyingTransactionManager.java:70)
+        at io.quarkus.narayana.jta.runtime.interceptor.TransactionalInterceptorBase.endTransaction(TransactionalInterceptorBase.java:406)
+        at io.quarkus.narayana.jta.runtime.interceptor.TransactionalInterceptorBase.invokeInOurTx(TransactionalInterceptorBase.java:171)
+        at io.quarkus.narayana.jta.runtime.interceptor.TransactionalInterceptorBase.invokeInOurTx(TransactionalInterceptorBase.java:107)
+        at io.quarkus.narayana.jta.runtime.interceptor.TransactionalInterceptorRequired.doIntercept(TransactionalInterceptorRequired.java:38)
+        at io.quarkus.narayana.jta.runtime.interceptor.TransactionalInterceptorBase.intercept(TransactionalInterceptorBase.java:61)
+        at io.quarkus.narayana.jta.runtime.interceptor.TransactionalInterceptorRequired.intercept(TransactionalInterceptorRequired.java:32)
+        at io.quarkus.narayana.jta.runtime.interceptor.TransactionalInterceptorRequired_Bean.intercept(Unknown Source)
+        at io.quarkus.arc.impl.InterceptorInvocation.invoke(InterceptorInvocation.java:42)
+        at io.quarkus.arc.impl.AroundInvokeInvocationContext.perform(AroundInvokeInvocationContext.java:30)
+        at io.quarkus.arc.impl.InvocationContexts.performAroundInvoke(InvocationContexts.java:27)
+        at org.acme.ClubResource_Subclass.create(Unknown Source)
+        at org.acme.ClubResource$quarkusrestinvoker$create_cca65a3766ba09b3426ebc5a4643f46fcd57af8e.invoke(Unknown Source)
+        at org.jboss.resteasy.reactive.server.handlers.InvocationHandler.handle(InvocationHandler.java:29)
+        at io.quarkus.resteasy.reactive.server.runtime.QuarkusResteasyReactiveRequestContext.invokeHandler(QuarkusResteasyReactiveRequestContext.java:183)
+        at org.jboss.resteasy.reactive.common.core.AbstractResteasyReactiveContext.run(AbstractResteasyReactiveContext.java:147)
+        at io.quarkus.vertx.core.runtime.VertxCoreRecorder$15.runWith(VertxCoreRecorder.java:645)
+        at org.jboss.threads.EnhancedQueueExecutor$Task.doRunWith(EnhancedQueueExecutor.java:2651)
+        at org.jboss.threads.EnhancedQueueExecutor$Task.run(EnhancedQueueExecutor.java:2630)
+        at org.jboss.threads.EnhancedQueueExecutor.runThreadBody(EnhancedQueueExecutor.java:1622)
+        at org.jboss.threads.EnhancedQueueExecutor$ThreadBody.run(EnhancedQueueExecutor.java:1589)
+        at org.jboss.threads.DelegatingRunnable.run(DelegatingRunnable.java:11)
+        at org.jboss.threads.ThreadLocalResettingRunnable.run(ThreadLocalResettingRunnable.java:11)
+        at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
+        at java.base@21.0.8/java.lang.Thread.run(Thread.java:1583)
+Caused by: org.h2.jdbc.JdbcSQLIntegrityConstraintViolationException: Unique index or primary key violation: "PRIMARY KEY ON PUBLIC.CLUB(ID) ( /* key:1 */ 100000000.00, CAST(1 AS BIGINT), 'Arandale FC')"; SQL statement:
+insert into Club (budget,name,id) values (?,?,?) [23505-230]
+        at app//org.h2.message.DbException.getJdbcSQLException(DbException.java:520)
+        at app//org.h2.message.DbException.getJdbcSQLException(DbException.java:489)
+        at app//org.h2.message.DbException.get(DbException.java:223)
+        at app//org.h2.message.DbException.get(DbException.java:199)
+        at app//org.h2.mvstore.db.MVPrimaryIndex.add(MVPrimaryIndex.java:121)
+        at app//org.h2.mvstore.db.MVTable.addRow(MVTable.java:518)
+        at app//org.h2.command.dml.Insert.insertRows(Insert.java:174)
+        at app//org.h2.command.dml.Insert.update(Insert.java:135)
+        at app//org.h2.command.dml.DataChangeStatement.update(DataChangeStatement.java:74)
+        at app//org.h2.command.CommandContainer.update(CommandContainer.java:139)
+        at app//org.h2.command.Command.executeUpdate(Command.java:304)
+        at app//org.h2.command.Command.executeUpdate(Command.java:248)
+        at app//org.h2.jdbc.JdbcPreparedStatement.executeUpdateInternal(JdbcPreparedStatement.java:213)
+        at app//org.h2.jdbc.JdbcPreparedStatement.executeUpdate(JdbcPreparedStatement.java:172)
+        at io.agroal.pool.wrapper.PreparedStatementWrapper.executeUpdate(PreparedStatementWrapper.java:90)
+        at org.hibernate.engine.jdbc.internal.ResultSetReturnImpl.executeUpdate(ResultSetReturnImpl.java:190)
+        ... 52 more
+HTTP Request to /clubs failed, error id: c2afbc55-d7c6-4dfe-91f1-c8abe872fe26-1
+io.quarkus.arc.ArcUndeclaredThrowableException: Error invoking subclass method
+        at org.acme.ClubResource_Subclass.create(Unknown Source)
+        at org.acme.ClubResource$quarkusrestinvoker$create_cca65a3766ba09b3426ebc5a4643f46fcd57af8e.invoke(Unknown Source)
+        at org.jboss.resteasy.reactive.server.handlers.InvocationHandler.handle(InvocationHandler.java:29)
+        at io.quarkus.resteasy.reactive.server.runtime.QuarkusResteasyReactiveRequestContext.invokeHandler(QuarkusResteasyReactiveRequestContext.java:183)
+        at org.jboss.resteasy.reactive.common.core.AbstractResteasyReactiveContext.run(AbstractResteasyReactiveContext.java:147)
+        at io.quarkus.vertx.core.runtime.VertxCoreRecorder$15.runWith(VertxCoreRecorder.java:645)
+        at org.jboss.threads.EnhancedQueueExecutor$Task.doRunWith(EnhancedQueueExecutor.java:2651)
+        at org.jboss.threads.EnhancedQueueExecutor$Task.run(EnhancedQueueExecutor.java:2630)
+        at org.jboss.threads.EnhancedQueueExecutor.runThreadBody(EnhancedQueueExecutor.java:1622)
+        at org.jboss.threads.EnhancedQueueExecutor$ThreadBody.run(EnhancedQueueExecutor.java:1589)
+        at org.jboss.threads.DelegatingRunnable.run(DelegatingRunnable.java:11)
+        at org.jboss.threads.ThreadLocalResettingRunnable.run(ThreadLocalResettingRunnable.java:11)
+        at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
+        at java.base@21.0.8/java.lang.Thread.run(Thread.java:1583)
+Caused by: jakarta.transaction.RollbackException: ARJUNA016053: Could not commit transaction.
+        at com.arjuna.ats.internal.jta.transaction.arjunacore.TransactionImple.commitAndDisassociate(TransactionImple.java:1319)
+        at com.arjuna.ats.internal.jta.transaction.arjunacore.BaseTransaction.commit(BaseTransaction.java:104)
+        at io.quarkus.narayana.jta.runtime.NotifyingTransactionManager.commit(NotifyingTransactionManager.java:70)
+        at io.quarkus.narayana.jta.runtime.interceptor.TransactionalInterceptorBase.endTransaction(TransactionalInterceptorBase.java:406)
+        at io.quarkus.narayana.jta.runtime.interceptor.TransactionalInterceptorBase.invokeInOurTx(TransactionalInterceptorBase.java:171)
+        at io.quarkus.narayana.jta.runtime.interceptor.TransactionalInterceptorBase.invokeInOurTx(TransactionalInterceptorBase.java:107)
+        at io.quarkus.narayana.jta.runtime.interceptor.TransactionalInterceptorRequired.doIntercept(TransactionalInterceptorRequired.java:38)
+        at io.quarkus.narayana.jta.runtime.interceptor.TransactionalInterceptorBase.intercept(TransactionalInterceptorBase.java:61)
+        at io.quarkus.narayana.jta.runtime.interceptor.TransactionalInterceptorRequired.intercept(TransactionalInterceptorRequired.java:32)
+        at io.quarkus.narayana.jta.runtime.interceptor.TransactionalInterceptorRequired_Bean.intercept(Unknown Source)
+        at io.quarkus.arc.impl.InterceptorInvocation.invoke(InterceptorInvocation.java:42)
+        at io.quarkus.arc.impl.AroundInvokeInvocationContext.perform(AroundInvokeInvocationContext.java:30)
+        at io.quarkus.arc.impl.InvocationContexts.performAroundInvoke(InvocationContexts.java:27)
+        ... 14 more
+Caused by: org.hibernate.exception.ConstraintViolationException: could not execute statement [Unique index or primary key violation: "PRIMARY KEY ON PUBLIC.CLUB(ID) ( /* key:1 */ 100000000.00, CAST(1 AS BIGINT), 'Arandale FC')"; SQL statement:
+insert into Club (budget,name,id) values (?,?,?) [23505-230]] [insert into Club (budget,name,id) values (?,?,?)]
+        at org.hibernate.dialect.H2Dialect.lambda$buildSQLExceptionConversionDelegate$1(H2Dialect.java:845)
+        at org.hibernate.exception.internal.StandardSQLExceptionConverter.convert(StandardSQLExceptionConverter.java:34)
+        at org.hibernate.engine.jdbc.spi.SqlExceptionHelper.convert(SqlExceptionHelper.java:115)
+        at org.hibernate.engine.jdbc.internal.ResultSetReturnImpl.executeUpdate(ResultSetReturnImpl.java:193)
+        at org.hibernate.engine.jdbc.mutation.internal.AbstractMutationExecutor.performNonBatchedMutation(AbstractMutationExecutor.java:148)
+        at org.hibernate.engine.jdbc.mutation.internal.MutationExecutorSingleNonBatched.performNonBatchedOperations(MutationExecutorSingleNonBatched.java:53)
+        at org.hibernate.engine.jdbc.mutation.internal.AbstractMutationExecutor.execute(AbstractMutationExecutor.java:66)
+        at org.hibernate.engine.jdbc.mutation.internal.AbstractMutationExecutor.execute(AbstractMutationExecutor.java:55)
+        at org.hibernate.persister.entity.mutation.InsertCoordinatorStandard.doStaticInserts(InsertCoordinatorStandard.java:191)
+        at org.hibernate.persister.entity.mutation.InsertCoordinatorStandard.coordinateInsert(InsertCoordinatorStandard.java:129)
+        at org.hibernate.persister.entity.mutation.InsertCoordinatorStandard.insert(InsertCoordinatorStandard.java:101)
+        at org.hibernate.action.internal.EntityInsertAction.execute(EntityInsertAction.java:113)
+        at org.hibernate.engine.spi.ActionQueue.executeActions(ActionQueue.java:646)
+        at org.hibernate.engine.spi.ActionQueue.executeActions(ActionQueue.java:513)
+        at org.hibernate.event.internal.AbstractFlushingEventListener.performExecutions(AbstractFlushingEventListener.java:378)
+        at org.hibernate.event.internal.DefaultFlushEventListener.onFlush(DefaultFlushEventListener.java:39)
+        at org.hibernate.event.service.internal.EventListenerGroupImpl.fireEventOnEachListener(EventListenerGroupImpl.java:140)
+        at org.hibernate.internal.SessionImpl.doFlush(SessionImpl.java:1443)
+        at org.hibernate.internal.SessionImpl.managedFlush(SessionImpl.java:488)
+        at org.hibernate.internal.SessionImpl.flushBeforeTransactionCompletion(SessionImpl.java:2321)
+        at org.hibernate.internal.SessionImpl.beforeTransactionCompletion(SessionImpl.java:2029)
+        at org.hibernate.engine.jdbc.internal.JdbcCoordinatorImpl.beforeTransactionCompletion(JdbcCoordinatorImpl.java:394)
+        at org.hibernate.resource.transaction.backend.jta.internal.JtaTransactionCoordinatorImpl.beforeCompletion(JtaTransactionCoordinatorImpl.java:328)
+        at org.hibernate.resource.transaction.backend.jta.internal.synchronization.SynchronizationCallbackCoordinatorNonTrackingImpl.beforeCompletion(SynchronizationCallbackCoordinatorNonTrackingImpl.java:39)
+        at org.hibernate.resource.transaction.backend.jta.internal.synchronization.RegisteredSynchronization.beforeCompletion(RegisteredSynchronization.java:33)
+        at com.arjuna.ats.internal.jta.resources.arjunacore.SynchronizationImple.beforeCompletion(SynchronizationImple.java:52)
+        at com.arjuna.ats.arjuna.coordinator.TwoPhaseCoordinator.beforeCompletion(TwoPhaseCoordinator.java:348)
+        at com.arjuna.ats.arjuna.coordinator.TwoPhaseCoordinator.end(TwoPhaseCoordinator.java:66)
+        at com.arjuna.ats.arjuna.AtomicAction.commit(AtomicAction.java:135)
+        at com.arjuna.ats.internal.jta.transaction.arjunacore.TransactionImple.commitAndDisassociate(TransactionImple.java:1307)
+        ... 26 more
+Caused by: org.h2.jdbc.JdbcSQLIntegrityConstraintViolationException: Unique index or primary key violation: "PRIMARY KEY ON PUBLIC.CLUB(ID) ( /* key:1 */ 100000000.00, CAST(1 AS BIGINT), 'Arandale FC')"; SQL statement:
+insert into Club (budget,name,id) values (?,?,?) [23505-230]
+        at app//org.h2.message.DbException.getJdbcSQLException(DbException.java:520)
+        at app//org.h2.message.DbException.getJdbcSQLException(DbException.java:489)
+        at app//org.h2.message.DbException.get(DbException.java:223)
+        at app//org.h2.message.DbException.get(DbException.java:199)
+        at app//org.h2.mvstore.db.MVPrimaryIndex.add(MVPrimaryIndex.java:121)
+        at app//org.h2.mvstore.db.MVTable.addRow(MVTable.java:518)
+        at app//org.h2.command.dml.Insert.insertRows(Insert.java:174)
+        at app//org.h2.command.dml.Insert.update(Insert.java:135)
+        at app//org.h2.command.dml.DataChangeStatement.update(DataChangeStatement.java:74)
+        at app//org.h2.command.CommandContainer.update(CommandContainer.java:139)
+        at app//org.h2.command.Command.executeUpdate(Command.java:304)
+        at app//org.h2.command.Command.executeUpdate(Command.java:248)
+        at app//org.h2.jdbc.JdbcPreparedStatement.executeUpdateInternal(JdbcPreparedStatement.java:213)
+        at app//org.h2.jdbc.JdbcPreparedStatement.executeUpdate(JdbcPreparedStatement.java:172)
+        at io.agroal.pool.wrapper.PreparedStatementWrapper.executeUpdate(PreparedStatementWrapper.java:90)
+        at org.hibernate.engine.jdbc.internal.ResultSetReturnImpl.executeUpdate(ResultSetReturnImpl.java:190)
+        ... 52 more
+
+> Task :test
+
+ClubResourceApiTest > create_valid_payload_persists_and_returns_201() FAILED
+    java.lang.AssertionError at ClubResourceApiTest.java:60
+
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+
+> Task :test FAILED
+
+12 tests completed, 1 failed
+
+[Incubating] Problems report is available at: file:///Users/arun-joy.joseph/IdeaProjects/transfer-market/build/reports/problems/problems-report.html
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':test'.
+> There were failing tests. See the report at: file:///Users/arun-joy.joseph/IdeaProjects/transfer-market/build/reports/tests/test/index.html
+
+* Try:
+> Run with --scan to generate a Build Scan (Powered by Develocity).
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.1.0/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD FAILED in 2m
+9 actionable tasks: 9 executed
+
