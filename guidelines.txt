@@ -2410,3 +2410,164 @@ For more on this, please refer to https://docs.gradle.org/9.1.0/userguide/comman
 BUILD FAILED in 2m
 9 actionable tasks: 9 executed
 
+
+
+
+
+➜  transfer-market git:(main) ✗ ./gradlew clean test
+Unrecognized configuration key "quarkus.hibernate-orm.schema.generation" was provided; it will be ignored; verify that the dependency extension for this configuration is set or that you did not make a typo
+HHH000247: ErrorCode: 90036, SQLState: 90036
+Sequence "CLUB_SEQ" not found; SQL statement:
+select next value for Club_SEQ [90036-230]
+HTTP Request to /clubs failed, error id: a50d1ea7-644b-46fd-9af4-4b9082ebbadd-1
+org.hibernate.exception.SQLGrammarException: Could not prepare statement [Sequence "CLUB_SEQ" not found; SQL statement:
+select next value for Club_SEQ [90036-230]] [select next value for Club_SEQ]
+        at org.hibernate.exception.internal.SQLExceptionTypeDelegate.convert(SQLExceptionTypeDelegate.java:64)
+        at org.hibernate.exception.internal.StandardSQLExceptionConverter.convert(StandardSQLExceptionConverter.java:34)
+        at org.hibernate.engine.jdbc.spi.SqlExceptionHelper.convert(SqlExceptionHelper.java:115)
+        at org.hibernate.engine.jdbc.internal.StatementPreparerImpl$StatementPreparationTemplate.prepareStatement(StatementPreparerImpl.java:198)
+        at org.hibernate.engine.jdbc.internal.StatementPreparerImpl.prepareStatement(StatementPreparerImpl.java:88)
+        at org.hibernate.engine.jdbc.internal.StatementPreparerImpl.prepareStatement(StatementPreparerImpl.java:82)
+        at org.hibernate.id.enhanced.SequenceStructure$1.getNextValue(SequenceStructure.java:111)
+        at org.hibernate.id.enhanced.PooledLoOptimizer.generate(PooledLoOptimizer.java:67)
+        at org.hibernate.id.enhanced.SequenceStyleGenerator.generate(SequenceStyleGenerator.java:533)
+        at org.hibernate.id.IdentifierGenerator.generate(IdentifierGenerator.java:135)
+        at org.hibernate.event.internal.AbstractSaveEventListener.generateId(AbstractSaveEventListener.java:158)
+        at org.hibernate.event.internal.AbstractSaveEventListener.saveWithGeneratedId(AbstractSaveEventListener.java:123)
+        at org.hibernate.event.internal.DefaultPersistEventListener.entityIsTransient(DefaultPersistEventListener.java:148)
+        at org.hibernate.event.internal.DefaultPersistEventListener.persist(DefaultPersistEventListener.java:92)
+        at org.hibernate.event.internal.DefaultPersistEventListener.onPersist(DefaultPersistEventListener.java:76)
+        at org.hibernate.event.internal.DefaultPersistEventListener.onPersist(DefaultPersistEventListener.java:52)
+        at org.hibernate.event.service.internal.EventListenerGroupImpl.fireEventOnEachListener(EventListenerGroupImpl.java:140)
+        at org.hibernate.internal.SessionImpl.firePersist(SessionImpl.java:692)
+        at org.hibernate.internal.SessionImpl.persist(SessionImpl.java:676)
+        at io.quarkus.hibernate.orm.runtime.session.TransactionScopedSession.persist(TransactionScopedSession.java:167)
+        at org.hibernate.engine.spi.SessionLazyDelegator.persist(SessionLazyDelegator.java:221)
+        at org.hibernate.Session_QdxvhYUzh5cgfepxgL43K9-OFvU_Synthetic_ClientProxy.persist(Unknown Source)
+        at io.quarkus.hibernate.orm.panache.common.runtime.AbstractJpaOperations.persist(AbstractJpaOperations.java:105)
+        at io.quarkus.hibernate.orm.panache.common.runtime.AbstractJpaOperations.persist(AbstractJpaOperations.java:100)
+        at io.quarkus.hibernate.orm.panache.PanacheEntityBase.persist(PanacheEntityBase.java:65)
+        at org.acme.ClubResource.create(ClubResource.java:42)
+        at org.acme.ClubResource_Subclass.create$$superforward(Unknown Source)
+        at org.acme.ClubResource_Subclass$$function$$1.apply(Unknown Source)
+        at io.quarkus.arc.impl.AroundInvokeInvocationContext.proceed(AroundInvokeInvocationContext.java:73)
+        at io.quarkus.arc.impl.AroundInvokeInvocationContext.proceed(AroundInvokeInvocationContext.java:62)
+        at io.quarkus.narayana.jta.runtime.interceptor.TransactionalInterceptorBase.invokeInOurTx(TransactionalInterceptorBase.java:136)
+        at io.quarkus.narayana.jta.runtime.interceptor.TransactionalInterceptorBase.invokeInOurTx(TransactionalInterceptorBase.java:107)
+        at io.quarkus.narayana.jta.runtime.interceptor.TransactionalInterceptorRequired.doIntercept(TransactionalInterceptorRequired.java:38)
+        at io.quarkus.narayana.jta.runtime.interceptor.TransactionalInterceptorBase.intercept(TransactionalInterceptorBase.java:61)
+        at io.quarkus.narayana.jta.runtime.interceptor.TransactionalInterceptorRequired.intercept(TransactionalInterceptorRequired.java:32)
+        at io.quarkus.narayana.jta.runtime.interceptor.TransactionalInterceptorRequired_Bean.intercept(Unknown Source)
+        at io.quarkus.arc.impl.InterceptorInvocation.invoke(InterceptorInvocation.java:42)
+        at io.quarkus.arc.impl.AroundInvokeInvocationContext.perform(AroundInvokeInvocationContext.java:30)
+        at io.quarkus.arc.impl.InvocationContexts.performAroundInvoke(InvocationContexts.java:27)
+        at org.acme.ClubResource_Subclass.create(Unknown Source)
+        at org.acme.ClubResource$quarkusrestinvoker$create_cca65a3766ba09b3426ebc5a4643f46fcd57af8e.invoke(Unknown Source)
+        at org.jboss.resteasy.reactive.server.handlers.InvocationHandler.handle(InvocationHandler.java:29)
+        at io.quarkus.resteasy.reactive.server.runtime.QuarkusResteasyReactiveRequestContext.invokeHandler(QuarkusResteasyReactiveRequestContext.java:183)
+        at org.jboss.resteasy.reactive.common.core.AbstractResteasyReactiveContext.run(AbstractResteasyReactiveContext.java:147)
+        at io.quarkus.vertx.core.runtime.VertxCoreRecorder$15.runWith(VertxCoreRecorder.java:645)
+        at org.jboss.threads.EnhancedQueueExecutor$Task.doRunWith(EnhancedQueueExecutor.java:2651)
+        at org.jboss.threads.EnhancedQueueExecutor$Task.run(EnhancedQueueExecutor.java:2630)
+        at org.jboss.threads.EnhancedQueueExecutor.runThreadBody(EnhancedQueueExecutor.java:1622)
+        at org.jboss.threads.EnhancedQueueExecutor$ThreadBody.run(EnhancedQueueExecutor.java:1589)
+        at org.jboss.threads.DelegatingRunnable.run(DelegatingRunnable.java:11)
+        at org.jboss.threads.ThreadLocalResettingRunnable.run(ThreadLocalResettingRunnable.java:11)
+        at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
+        at java.base@21.0.8/java.lang.Thread.run(Thread.java:1583)
+Caused by: org.h2.jdbc.JdbcSQLSyntaxErrorException: Sequence "CLUB_SEQ" not found; SQL statement:
+select next value for Club_SEQ [90036-230]
+        at app//org.h2.message.DbException.getJdbcSQLException(DbException.java:644)
+        at app//org.h2.message.DbException.getJdbcSQLException(DbException.java:489)
+        at app//org.h2.message.DbException.get(DbException.java:223)
+        at app//org.h2.message.DbException.get(DbException.java:199)
+        at app//org.h2.command.Parser.readSequence(Parser.java:8017)
+        at app//org.h2.command.Parser.readTermWithIdentifier(Parser.java:5276)
+        at app//org.h2.command.Parser.readTermWithIdentifier(Parser.java:5146)
+        at app//org.h2.command.Parser.readTerm(Parser.java:4826)
+        at app//org.h2.command.Parser.readFactor(Parser.java:3322)
+        at app//org.h2.command.Parser.readSum(Parser.java:3309)
+        at app//org.h2.command.Parser.readConcat(Parser.java:3274)
+        at app//org.h2.command.Parser.readCondition(Parser.java:3064)
+        at app//org.h2.command.Parser.readExpression(Parser.java:2984)
+        at app//org.h2.command.Parser.parseSelectExpressions(Parser.java:2784)
+        at app//org.h2.command.Parser.parseSelect(Parser.java:2802)
+        at app//org.h2.command.Parser.parseQueryPrimary(Parser.java:2691)
+        at app//org.h2.command.Parser.parseQueryTerm(Parser.java:2546)
+        at app//org.h2.command.Parser.parseQueryExpressionBody(Parser.java:2525)
+        at app//org.h2.command.Parser.parseQueryExpressionBodyAndEndOfQuery(Parser.java:2518)
+        at app//org.h2.command.Parser.parseQueryExpression(Parser.java:2511)
+        at app//org.h2.command.Parser.parseQuery(Parser.java:2478)
+        at app//org.h2.command.Parser.parsePrepared(Parser.java:609)
+        at app//org.h2.command.Parser.parse(Parser.java:580)
+        at app//org.h2.command.Parser.parse(Parser.java:555)
+        at app//org.h2.command.Parser.prepareCommand(Parser.java:484)
+        at app//org.h2.engine.SessionLocal.prepareLocal(SessionLocal.java:644)
+        at app//org.h2.engine.SessionLocal.prepareCommand(SessionLocal.java:560)
+        at app//org.h2.jdbc.JdbcConnection.prepareCommand(JdbcConnection.java:1164)
+        at app//org.h2.jdbc.JdbcPreparedStatement.<init>(JdbcPreparedStatement.java:93)
+        at app//org.h2.jdbc.JdbcConnection.prepareStatement(JdbcConnection.java:315)
+        at io.agroal.pool.wrapper.ConnectionWrapper.prepareStatement(ConnectionWrapper.java:649)
+        at org.hibernate.engine.jdbc.internal.StatementPreparerImpl$1.doPrepare(StatementPreparerImpl.java:103)
+        at org.hibernate.engine.jdbc.internal.StatementPreparerImpl$StatementPreparationTemplate.prepareStatement(StatementPreparerImpl.java:187)
+        ... 49 more
+
+> Task :test
+
+ClubResourceApiTest > create_valid_payload_persists_and_returns_201() FAILED
+    java.lang.AssertionError at ClubResourceApiTest.java:60
+
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+HHH000247: ErrorCode: 42102, SQLState: 42S02
+Table "PLAYER" not found; SQL statement:
+delete from Player p1_0 [42102-230]
+HHH000247: ErrorCode: 42102, SQLState: 42S02
+Table "PLAYER" not found; SQL statement:
+delete from Player p1_0 [42102-230]
+HHH000247: ErrorCode: 42102, SQLState: 42S02
+Table "PLAYER" not found; SQL statement:
+delete from Player p1_0 [42102-230]
+HHH000247: ErrorCode: 42102, SQLState: 42S02
+Table "PLAYER" not found; SQL statement:
+delete from Player p1_0 [42102-230]
+
+> Task :test FAILED
+
+TransferServiceTest > fails_when_buyer_already_owner() FAILED
+    org.hibernate.exception.SQLGrammarException at TransferServiceTest.java:26
+        Caused by: org.h2.jdbc.JdbcSQLSyntaxErrorException at TransferServiceTest.java:26
+
+TransferServiceTest > fails_when_buyer_cannot_afford() FAILED
+    org.hibernate.exception.SQLGrammarException at TransferServiceTest.java:26
+        Caused by: org.h2.jdbc.JdbcSQLSyntaxErrorException at TransferServiceTest.java:26
+
+TransferServiceTest > success_moves_ownership_and_updates_budgets() FAILED
+    org.hibernate.exception.SQLGrammarException at TransferServiceTest.java:26
+        Caused by: org.h2.jdbc.JdbcSQLSyntaxErrorException at TransferServiceTest.java:26
+
+TransferServiceTest > fails_when_entities_missing() FAILED
+    org.hibernate.exception.SQLGrammarException at TransferServiceTest.java:26
+        Caused by: org.h2.jdbc.JdbcSQLSyntaxErrorException at TransferServiceTest.java:26
+
+12 tests completed, 5 failed
+
+[Incubating] Problems report is available at: file:///Users/arun-joy.joseph/IdeaProjects/transfer-market/build/reports/problems/problems-report.html
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':test'.
+> There were failing tests. See the report at: file:///Users/arun-joy.joseph/IdeaProjects/transfer-market/build/reports/tests/test/index.html
+
+* Try:
+> Run with --scan to generate a Build Scan (Powered by Develocity).
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.1.0/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD FAILED in 2m 1s
+9 actionable tasks: 9 executed
+
