@@ -1,6 +1,5 @@
 ===== /Users/arun-joy.joseph/IdeaProjects/transfer-market/src/main/java/org/acme/dto/CreatePlayerRequest.java =====
-package org.acme.dto; // package groups related classes
-
+package org.acme.dto;
 import java.math.BigDecimal;
 
 public class CreatePlayerRequest {         // maps incoming JSON when creating a player
@@ -10,9 +9,9 @@ public class CreatePlayerRequest {         // maps incoming JSON when creating a
 }
 
 ===== /Users/arun-joy.joseph/IdeaProjects/transfer-market/src/main/java/org/acme/dto/CreateClubRequest.java =====
-package org.acme.dto; // package groups related classes
+package org.acme.dto;
 
-import java.math.BigDecimal;               // keep money precise
+import java.math.BigDecimal;
 
 public class CreateClubRequest {           // maps incoming JSON when creating a club
     public String name;                    // club name
@@ -30,7 +29,7 @@ package org.acme.dto;
 
 import java.math.BigDecimal;
 
-public class TransferResult {              // a friendly response after a transfer
+public class TransferResult {              // response after transfer
     public Long playerId;
     public String playerName;
     public String fromClub;
@@ -66,7 +65,7 @@ public class ClubResource {
     @GET
     @Path("/{id}")                                                       // GET /clubs/{id}
     public Club get(@PathParam("id") Long id) {                          // read one club
-        return Club.findByIdOptional(id)                                 // returns Optional<Club>
+        return Club.<Club>findByIdOptional(id)                                 // returns Optional<Club>
                 .orElseThrow(() -> new NotFoundException("Club not found: " + id));
     }
 
@@ -89,6 +88,114 @@ public class ClubResource {
                 .build();
     }
 }
+===== /Users/arun-joy.joseph/IdeaProjects/transfer-market/src/main/java/org/acme/PlayerResource.java =====
+package org.acme;
+
+import org.acme.dto.CreatePlayerRequest;
+import io.smallrye.common.annotation.Blocking;                           // blocking (JPA)
+import jakarta.transaction.Transactional;                                 // DB write boundary
+import jakarta.ws.rs.*;                                                   // JAX-RS
+import jakarta.ws.rs.core.MediaType;                                      // JSON content-type
+import jakarta.ws.rs.core.Response;                                       // HTTP responses
+import java.math.BigDecimal;                                              // for price checks
+import java.util.List;                                                    // list endpoint
+
+@Path("/players")                                                         // base path for player API
+@Consumes(MediaType.APPLICATION_JSON)
+@Produces(MediaType.APPLICATION_JSON)
+@Blocking
+public class PlayerResource {
+
+    @GET                                                                  // GET /players
+    public List<Player> list() {
+        return Player.listAll();                                          // SELECT * FROM Player
+    }
+
+    @GET
+    @Path("/{id}")                                                        // GET /players/{id}
+    public Player get(@PathParam("id") Long id) {
+        return Player.<Player>findByIdOptional(id)
+                .orElseThrow(() -> new NotFoundException("Player not found: " + id));
+    }
+
+    @POST                                                                 // POST /players
+    @Transactional
+    public Response create(CreatePlayerRequest req) {
+        if (req == null || req.name == null || req.name.isBlank())
+            throw new BadRequestException("name is required");
+        if (req.price == null || req.price.compareTo(BigDecimal.ZERO) < 0)
+            throw new BadRequestException("price must be >= 0");
+        if (req.clubId == null)
+            throw new BadRequestException("clubId is required");
+
+        Club club = Club.<Club>findByIdOptional(req.clubId)                     // resolve owning club
+                .orElseThrow(() -> new NotFoundException("clubId not found: " + req.clubId));
+
+        Player p = new Player();                                          // new player
+        p.name = req.name.trim();                                         // set fields
+        p.price = req.price;
+        p.club = club;                                                    // link to owner club
+        p.persist();                                                      // INSERT
+
+        return Response.status(Response.Status.CREATED).entity(p).build();// return 201
+    }
+}
+===== /Users/arun-joy.joseph/IdeaProjects/transfer-market/src/main/java/org/acme/TransferService.java =====
+package org.acme;
+
+import org.acme.dto.TransferResult;                 // response DTO
+import jakarta.enterprise.context.ApplicationScoped;            // CDI bean (one per app)
+import jakarta.transaction.Transactional;                       // wrap transfer in a transaction
+import jakarta.ws.rs.BadRequestException;                       // 400 on invalid request
+import jakarta.ws.rs.NotFoundException;                         // 404 when entity missing
+import java.math.BigDecimal;                                    // money operations
+
+@ApplicationScoped                                               // managed bean
+public class TransferService {
+
+    @Transactional                                              // all DB changes happen atomically
+    public TransferResult transfer(Long buyerClubId, Long playerId) {
+        if (buyerClubId == null || playerId == null)
+            throw new BadRequestException("buyerClubId and playerId are required");
+
+        Club buyer = Club.<Club>findByIdOptional(buyerClubId)         // fetch buyer
+                .orElseThrow(() -> new NotFoundException("Buyer club not found: " + buyerClubId));
+
+        Player player = Player.<Player>findByIdOptional(playerId)       // fetch player
+                .orElseThrow(() -> new NotFoundException("Player not found: " + playerId));
+
+        Club seller = player.club;                              // current owner
+        if (seller == null)
+            throw new BadRequestException("Player has no current club");
+        if (seller.id.equals(buyer.id))
+            throw new BadRequestException("Buyer already owns this player");
+
+        BigDecimal price = player.price;                        // agreed price
+        if (buyer.budget.compareTo(price) < 0)                  // can buyer afford?
+            throw new BadRequestException("Buyer cannot afford this player");
+
+        // Money moves: buyer pays, seller receives
+        buyer.budget = buyer.budget.subtract(price);            // deduct from buyer
+        seller.budget = seller.budget.add(price);               // add to seller
+
+        // Transfer registration
+        player.club = buyer;                                    // change ownership
+
+        // No explicit persist() needed: entities are managed in a transaction.
+
+        // result payload
+        TransferResult result = new TransferResult();
+        result.playerId = player.id;
+        result.playerName = player.name;
+        result.fromClub = seller.name;
+        result.toClub = buyer.name;
+        result.price = price;
+        result.buyerBudgetAfter = buyer.budget;
+        result.sellerBudgetAfter = seller.budget;
+
+        return result;                                          // returned as JSON by resource
+    }
+}
 ===== /Users/arun-joy.joseph/IdeaProjects/transfer-market/src/main/java/org/acme/GreetingResource.java =====
 package org.acme;
 
@@ -103,7 +210,7 @@ public class GreetingResource {
     @GET
     @Produces(MediaType.TEXT_PLAIN)
     public String hello() {
-        return "Hello from REST";
+        return "Hello from Quarkus REST";
     }
 }
 
@@ -135,25 +242,218 @@ public class Player extends PanacheEntity {                   // id (Long) provi
         return club == null ? null : club.id;                 // compute club id for clients
     }
 }
-===== /Users/arun-joy.joseph/IdeaProjects/transfer-market/src/main/java/org/acme/Club.java =====
-package org.acme; // package groups related classes
+===== /Users/arun-joy.joseph/IdeaProjects/transfer-market/src/main/java/org/acme/TransferResource.java =====
+package org.acme;
 
-import io.quarkus.hibernate.orm.panache.PanacheEntity;       // Panache base entity (id + helpers)
-import jakarta.persistence.*;                                // JPA annotations
-import java.math.BigDecimal;                                 // precise money type
-import java.util.List;                                       // list for players
+import org.acme.dto.TransferRequest;                 // input DTO
+import org.acme.dto.TransferResult;                  // output DTO
+import io.smallrye.common.annotation.Blocking;                   // JPA is blocking
+import jakarta.inject.Inject;                                    // DI for service
+import jakarta.ws.rs.*;                                          // JAX-RS annotations
+import jakarta.ws.rs.core.MediaType;                             // JSON
+import jakarta.ws.rs.core.Response;                              // HTTP responses
+
+@Path("/transfers")                                              // base path for transfers
+@Consumes(MediaType.APPLICATION_JSON)
+@Produces(MediaType.APPLICATION_JSON)
+@Blocking
+public class TransferResource {
+
+    @Inject                                                      // inject our business service
+    TransferService service;
+
+    @POST                                                        // POST /transfers
+    public Response transfer(TransferRequest req) {              // JSON -> DTO
+        TransferResult result = service.transfer(req.buyerClubId, req.playerId);  // do it
+        return Response.ok(result).build();                      // 200 with result JSON
+    }
+}
+===== /Users/arun-joy.joseph/IdeaProjects/transfer-market/src/main/java/org/acme/Club.java =====
+package org.acme;
+
+import io.quarkus.hibernate.orm.panache.PanacheEntity;
+import jakarta.persistence.*;
+import java.math.BigDecimal;
+import java.util.List;
 
 @Entity                                                      // Marks this as a JPA entity (mapped to a table)
 public class Club extends PanacheEntity {                    // Extends PanacheEntity => gets a Long id and helpers
 
-    @Column(nullable = false, unique = true)                 // name must be present and unique across clubs
+    @Column(nullable = false, unique = true)
     public String name;
 
-    @Column(nullable = false, precision = 19, scale = 2)     // money as DECIMAL(19,2)
+    @Column(nullable = false, precision = 19, scale = 2)
     public BigDecimal budget;
 
     @OneToMany(mappedBy = "club",                            // players reference their club; 'club' is the owner side
             cascade = CascadeType.ALL,                    // propagate saves/deletes to players
-            orphanRemoval = true)                         // remove players if they’re de-linked (not used here, but safe)
+            orphanRemoval = true)                         // remove players if they’re de-linked
     public List<Player> players;                             // list of players for this club
 }
+===== /Users/arun-joy.joseph/IdeaProjects/transfer-market/src/main/java/org/acme/GenericExceptionMapper.java =====
+package org.acme;
+
+import jakarta.ws.rs.ext.ExceptionMapper;
+import jakarta.ws.rs.ext.Provider;
+import jakarta.ws.rs.core.Response;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.NotFoundException;
+import jakarta.ws.rs.BadRequestException;
+import java.util.HashMap;
+import java.util.Map;
+
+@Provider
+public class GenericExceptionMapper implements ExceptionMapper<Throwable> {
+    @Override
+    public Response toResponse(Throwable exception) {
+        Map<String, String> error = new HashMap<>();
+        error.put("error", exception.getMessage());
+
+        if (exception instanceof NotFoundException) {
+            return Response.status(Response.Status.NOT_FOUND)
+                    .entity(error)
+                    .type(MediaType.APPLICATION_JSON)
+                    .build();
+        } else if (exception instanceof BadRequestException) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity(error)
+                    .type(MediaType.APPLICATION_JSON)
+                    .build();
+        } else {
+            // For all other exceptions, return 500
+            error.put("error", "Internal server error");
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity(error)
+                    .type(MediaType.APPLICATION_JSON)
+                    .build();
+        }
+    }
+}
+
+===== /Users/arun-joy.joseph/IdeaProjects/transfer-market/build.gradle =====
+
+plugins {
+    id 'java'
+    id 'io.quarkus' version '3.28.2'
+
+}
+
+repositories {
+    mavenCentral()
+    mavenLocal()
+    maven {
+        url = "https://nexus.mgmt-bld.oncp.dev/repository/maven-public/"
+    }
+    maven {
+        url = "https://nexus.sbs-bld.oncp.dev/repository/sbs-pdt/"
+    }
+    maven {
+        url = "https://nexus.sbs-bld.oncp.dev/repository/shared-services/"
+    }
+}
+
+dependencies {
+    implementation enforcedPlatform("io.quarkus.platform:quarkus-bom:3.28.2")
+    implementation "io.quarkus:quarkus-rest"
+    implementation "io.quarkus:quarkus-rest-jackson"
+    implementation "io.quarkus:quarkus-hibernate-orm-panache"
+    implementation "io.quarkus:quarkus-jdbc-h2"
+    testImplementation "io.quarkus:quarkus-junit5"
+    testImplementation "io.rest-assured:rest-assured"
+    testImplementation "io.quarkus:quarkus-junit5-mockito"
+    testImplementation "io.quarkus:quarkus-panache-mock"
+}
+
+group = 'org.acme'
+version = '1.0.0-SNAPSHOT'
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+}
+
+test {
+    systemProperty "java.util.logging.manager", "org.jboss.logmanager.LogManager"
+}
+compileJava {
+    options.encoding = 'UTF-8'
+    options.compilerArgs << '-parameters'
+}
+
+compileTestJava {
+    options.encoding = 'UTF-8'
+}
+
+===== /Users/arun-joy.joseph/IdeaProjects/transfer-market/settings.gradle =====
+
+
+pluginManagement {
+    repositories {
+        mavenCentral()
+        gradlePluginPortal()
+        mavenLocal()
+        maven {
+            url 'https://nexus.mgmt-bld.oncp.dev/repository/maven-public/'
+        }
+        maven {
+            url = "https://nexus.sbs-bld.oncp.dev/repository/sbs-pdt/"
+        }
+    }
+    plugins {
+//        id "${quarkusPluginId}" version "${quarkusPluginVersion}"
+    }
+}
+rootProject.name='transfer-market'
+
+
+===== /Users/arun-joy.joseph/IdeaProjects/transfer-market/gradle.properties =====
+
+# Gradle properties
+
+quarkusPluginId=io.quarkus
+quarkusPluginVersion=3.28.2
+quarkusPlatformGroupId=io.quarkus.platform
+quarkusPlatformArtifactId=quarkus-bom
+quarkusPlatformVersion=3.28.2
+
+
+===== /Users/arun-joy.joseph/IdeaProjects/transfer-market/src/main/resources/application.properties =====
+
+# CORS (current key)
+quarkus.http.cors.enabled=true
+
+# H2 datasource
+quarkus.datasource.db-kind=h2
+quarkus.datasource.jdbc.url=jdbc:h2:mem:transferdb;DB_CLOSE_DELAY=-1
+quarkus.datasource.username=sa
+quarkus.datasource.password=sa
+
+# DDL (use the key your version recognizes)
+quarkus.hibernate-orm.database.generation=drop-and-create
+
+# Logging keys
+quarkus.hibernate-orm.log.sql=true
+quarkus.hibernate-orm.log.format-sql=true
+
+# Seed in dev/main only (tests override it to 'no-file')
+quarkus.hibernate-orm.sql-load-script=import.sql
+
+
+===== /Users/arun-joy.joseph/IdeaProjects/transfer-market/src/main/resources/import.sql =====
+
+-- Clubs
+INSERT INTO Club(id, name, budget) VALUES (1, 'Arandale FC', 100000000.00);
+INSERT INTO Club(id, name, budget) VALUES (2, 'Bristol Rovers 2.0', 45000000.00);
+INSERT INTO Club(id, name, budget) VALUES (3, 'Manchester United', 200000000.00);
+INSERT INTO Club(id, name, budget) VALUES (4, 'Chelsea FC', 180000000.00);
+INSERT INTO Club(id, name, budget) VALUES (5, 'FC Barcelona', 220000000.00);
+
+-- Players
+INSERT INTO Player(id, name, price, club_id) VALUES (1, 'Luis Bento', 30000000.00, 1);
+INSERT INTO Player(id, name, price, club_id) VALUES (2, 'Marco Silva', 60000000.00, 1);
+INSERT INTO Player(id, name, price, club_id) VALUES (3, 'Cristiano Ronaldo', 90000000.00, 3);
+INSERT INTO Player(id, name, price, club_id) VALUES (4, 'Marcus Rashford', 70000000.00, 3);
+INSERT INTO Player(id, name, price, club_id) VALUES (5, 'Mason Mount', 60000000.00, 4);
+INSERT INTO Player(id, name, price, club_id) VALUES (6, 'Raheem Sterling', 65000000.00, 4);
+INSERT INTO Player(id, name, price, club_id) VALUES (7, 'Robert Lewandowski', 85000000.00, 5);
+INSERT INTO Player(id, name, price, club_id) VALUES (8, 'Pedri', 75000000.00, 5);
