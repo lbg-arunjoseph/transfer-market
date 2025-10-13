@@ -2930,4 +2930,54 @@ curl -X POST http://localhost:8080/chat \
   -d '{"question":"How many clubs are registered?"}'
 
 
+➜  transfer-market git:(main) ✗ ollama serve
+Error: listen tcp 127.0.0.1:11434: bind: address already in use
+
+➜  transfer-market git:(main) ✗ curl http://127.0.0.1:11434/api/generate -d '{
+"model":"mistral:latest",
+"prompt":"hi"
+}'
+{"model":"mistral:latest","created_at":"2025-10-13T08:57:52.762622Z","response":" Hello","done":false}
+{"model":"mistral:latest","created_at":"2025-10-13T08:57:52.78411Z","response":" there","done":false}
+{"model":"mistral:latest","created_at":"2025-10-13T08:57:52.80579Z","response":"!","done":false}
+{"model":"mistral:latest","created_at":"2025-10-13T08:57:52.827607Z","response":" How","done":false}
+{"model":"mistral:latest","created_at":"2025-10-13T08:57:52.849439Z","response":" can","done":false}
+{"model":"mistral:latest","created_at":"2025-10-13T08:57:52.871199Z","response":" I","done":false}
+{"model":"mistral:latest","created_at":"2025-10-13T08:57:52.89258Z","response":" help","done":false}
+{"model":"mistral:latest","created_at":"2025-10-13T08:57:52.913907Z","response":" you","done":false}
+{"model":"mistral:latest","created_at":"2025-10-13T08:57:52.935327Z","response":" today","done":false}
+{"model":"mistral:latest","created_at":"2025-10-13T08:57:52.956937Z","response":"?","done":false}
+{"model":"mistral:latest","created_at":"2025-10-13T08:57:52.979207Z","response":" Is","done":false}
+{"model":"mistral:latest","created_at":"2025-10-13T08:57:53.000648Z","response":" there","done":false}
+{"model":"mistral:latest","created_at":"2025-10-13T08:57:53.022435Z","response":" something","done":false}
+{"model":"mistral:latest","created_at":"2025-10-13T08:57:53.044074Z","response":" specific","done":false}
+{"model":"mistral:latest","created_at":"2025-10-13T08:57:53.065623Z","response":" you","done":false}
+{"model":"mistral:latest","created_at":"2025-10-13T08:57:53.087011Z","response":"'","done":false}
+{"model":"mistral:latest","created_at":"2025-10-13T08:57:53.108621Z","response":"d","done":false}
+{"model":"mistral:latest","created_at":"2025-10-13T08:57:53.130473Z","response":" like","done":false}
+{"model":"mistral:latest","created_at":"2025-10-13T08:57:53.152195Z","response":" to","done":false}
+{"model":"mistral:latest","created_at":"2025-10-13T08:57:53.174077Z","response":" talk","done":false}
+{"model":"mistral:latest","created_at":"2025-10-13T08:57:53.195664Z","response":" about","done":false}
+{"model":"mistral:latest","created_at":"2025-10-13T08:57:53.217213Z","response":" or","done":false}
+{"model":"mistral:latest","created_at":"2025-10-13T08:57:53.238697Z","response":" ask","done":false}
+{"model":"mistral:latest","created_at":"2025-10-13T08:57:53.260233Z","response":" me","done":false}
+{"model":"mistral:latest","created_at":"2025-10-13T08:57:53.281792Z","response":" a","done":false}
+{"model":"mistral:latest","created_at":"2025-10-13T08:57:53.303432Z","response":" question","done":false}
+{"model":"mistral:latest","created_at":"2025-10-13T08:57:53.325061Z","response":" on","done":false}
+{"model":"mistral:latest","created_at":"2025-10-13T08:57:53.346674Z","response":"?","done":false}
+{"model":"mistral:latest","created_at":"2025-10-13T08:57:53.368513Z","response":" I","done":false}
+{"model":"mistral:latest","created_at":"2025-10-13T08:57:53.390081Z","response":"'","done":false}
+{"model":"mistral:latest","created_at":"2025-10-13T08:57:53.411639Z","response":"m","done":false}
+{"model":"mistral:latest","created_at":"2025-10-13T08:57:53.433178Z","response":" here","done":false}
+{"model":"mistral:latest","created_at":"2025-10-13T08:57:53.45454Z","response":" to","done":false}
+{"model":"mistral:latest","created_at":"2025-10-13T08:57:53.476374Z","response":" assist","done":false}
+{"model":"mistral:latest","created_at":"2025-10-13T08:57:53.497962Z","response":" with","done":false}
+{"model":"mistral:latest","created_at":"2025-10-13T08:57:53.519566Z","response":" a","done":false}
+{"model":"mistral:latest","created_at":"2025-10-13T08:57:53.541147Z","response":" wide","done":false}
+{"model":"mistral:latest","created_at":"2025-10-13T08:57:53.562779Z","response":" range","done":false}
+{"model":"mistral:latest","created_at":"2025-10-13T08:57:53.58415Z","response":" of","done":false}
+{"model":"mistral:latest","created_at":"2025-10-13T08:57:53.605821Z","response":" topics","done":false}
+{"model":"mistral:latest","created_at":"2025-10-13T08:57:53.627494Z","response":".","done":false}
+{"model":"mistral:latest","created_at":"2025-10-13T08:57:53.649115Z","response":"","done":true,"done_reason":"stop","context":[3,29473,12782,4,29473,23325,1504,29576,2370,1309,1083,2084,1136,3922,29572,2459,1504,2313,3716,1136,29510,29483,1505,1066,2753,1452,1210,2228,1296,1032,3764,1124,29572,1083,29510,29487,2004,1066,6799,1163,1032,6103,3587,1070,14585,29491],"total_duration":1005199708,"load_duration":22336250,"prompt_eval_count":5,"prompt_eval_duration":95504250,"eval_count":42,"eval_duration":886722959}
+
 
