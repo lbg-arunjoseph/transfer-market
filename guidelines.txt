@@ -2981,3 +2981,149 @@ Error: listen tcp 127.0.0.1:11434: bind: address already in use
 {"model":"mistral:latest","created_at":"2025-10-13T08:57:53.649115Z","response":"","done":true,"done_reason":"stop","context":[3,29473,12782,4,29473,23325,1504,29576,2370,1309,1083,2084,1136,3922,29572,2459,1504,2313,3716,1136,29510,29483,1505,1066,2753,1452,1210,2228,1296,1032,3764,1124,29572,1083,29510,29487,2004,1066,6799,1163,1032,6103,3587,1070,14585,29491],"total_duration":1005199708,"load_duration":22336250,"prompt_eval_count":5,"prompt_eval_duration":95504250,"eval_count":42,"eval_duration":886722959}
 
 
+private static final String SCHEMA = """
+You answer questions about a small football DB.
+
+SCHEMA
+- TABLE Club (id BIGINT, name VARCHAR, budget DECIMAL(19,2))
+- TABLE Player (id BIGINT, name VARCHAR, price DECIMAL(19,2), club_id BIGINT)
+- Relation: Player.club_id -> Club.id
+
+STRICT OUTPUT (valid JSON only; no code fences; no prose)
+- If you need database data, respond ONLY:
+  {"type":"sql","sql":"<a single SELECT using only Club and/or Player>"}
+- When you can answer, respond ONLY:
+  {"type":"final","answer":"<natural language answer>"}
+
+RULES
+- Only SELECT queries. Never INSERT/UPDATE/DELETE/DDL.
+- Join on p.club_id = c.id when needed (e.g. Player p JOIN Club c ON p.club_id = c.id).
+- Keep SQL simple. You may use aliases like SELECT COUNT(*) AS cnt.
+""";
+
+
+
+package org.acme.ai;
+
+import java.util.regex.Pattern;
+
+public final class SafeSql {
+    private static final Pattern SELECT_ONLY = Pattern.compile("^\\s*select\\b", Pattern.CASE_INSENSITIVE);
+    private static final Pattern FORBIDDEN = Pattern.compile("\\b(insert|update|delete|merge|drop|alter|create|truncate|grant|revoke)\\b", Pattern.CASE_INSENSITIVE);
+    private static final Pattern TABLE_WHITELIST = Pattern.compile("\\b(from|join)\\s+(Club|Player)\\b", Pattern.CASE_INSENSITIVE);
+
+    private SafeSql() {}
+
+    public static void validate(String sql) {
+        if (sql == null || sql.isBlank()) throw new IllegalArgumentException("Empty SQL");
+        String s = sql.trim();
+        if (!SELECT_ONLY.matcher(s).find()) throw new IllegalArgumentException("Only SELECT queries are allowed");
+        if (FORBIDDEN.matcher(s).find()) throw new IllegalArgumentException("Forbidden SQL keyword detected");
+        if (!TABLE_WHITELIST.matcher(s).find())
+            throw new IllegalArgumentException("Query must reference only the allowed tables (Club, Player).");
+    }
+}
+
+
+
+public static final class AgentResult {
+    public final String answer;
+    public final boolean usedSql;
+    public AgentResult(String answer, boolean usedSql) { this.answer = answer; this.usedSql = usedSql; }
+}
+
+
+private record ToolMsg(String type, String sql, String answer) {}
+
+
+
+public AgentResult run(String userQuestion) {
+    try {
+        var messages = List.of(
+            Map.of("role","system","content", SCHEMA),
+            Map.of("role","user","content", userQuestion)
+        );
+
+        String lastObservation = null;
+        boolean usedSql = false;
+
+        for (int step = 0; step <= maxToolSteps; step++) {
+            var body = mapper.writeValueAsString(Map.of(
+                    "model", model,
+                    "format", "json",
+                    "messages", messagesWithObservation(messages, lastObservation),
+                    "stream", false
+            ));
+
+            var req = HttpRequest.newBuilder()
+                    .uri(URI.create(baseUrl + "/api/chat"))
+                    .timeout(Duration.ofSeconds(30))
+                    .header("Content-Type","application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(body))
+                    .build();
+
+            var resp = http.send(req, HttpResponse.BodyHandlers.ofString());
+            if (resp.statusCode() >= 300) {
+                return new AgentResult("LLM error: " + resp.statusCode() + " " + resp.body(), usedSql);
+            }
+
+            var root = mapper.readTree(resp.body());
+            var content = root.path("message").path("content").asText();
+
+            content = content.strip();
+            if (content.startsWith("```")) {
+                int first = content.indexOf('{');
+                int last = content.lastIndexOf('}');
+                if (first >= 0 && last > first) content = content.substring(first, last + 1);
+            }
+
+            ToolMsg tool;
+            try {
+                tool = mapper.readValue(content, ToolMsg.class);
+            } catch (Exception parseEx) {
+                return new AgentResult("Sorry, I couldn't interpret the model response.", usedSql);
+            }
+
+            if (tool.type() == null) {
+                return new AgentResult("Sorry, I couldn't interpret the model response.", usedSql);
+            }
+
+            if ("final".equalsIgnoreCase(tool.type())) {
+                var ans = (tool.answer() == null || tool.answer().isBlank())
+                        ? "I don't have an answer."
+                        : tool.answer();
+                return new AgentResult(ans, usedSql);
+            }
+
+            if ("sql".equalsIgnoreCase(tool.type())) {
+                usedSql = true;
+                var rows = sqlRunner.run(tool.sql());
+                lastObservation = mapper.writeValueAsString(Map.of("rows", rows));
+                continue;
+            }
+
+            return new AgentResult("Sorry, I couldn't interpret the model response.", usedSql);
+        }
+
+        return new AgentResult("I couldn't derive a final answer.", usedSql);
+
+    } catch (Exception e) {
+        return new AgentResult("Agent loop failed: " + e.getMessage(), false);
+    }
+}
+
+
+@POST
+public Response chat(ChatRequest req) {
+    if (req == null || req.question == null || req.question.isBlank())
+        throw new BadRequestException("question is required");
+
+    var result = agent.run(req.question);
+
+    var out = new ChatResponse();
+    out.answer = result.answer;
+    out.usedSql = result.usedSql;
+
+    return Response.ok(out).build();
+}
+
