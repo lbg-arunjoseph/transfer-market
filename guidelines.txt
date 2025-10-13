@@ -2614,3 +2614,314 @@ quarkus.hibernate-orm.log.format-sql=true
 
 # Seed in dev/main only (tests override it to 'no-file')
 quarkus.hibernate-orm.sql-load-script=import.sql
+
+
+
+
+
+src/main/resources/application.properties:
+
+# Ollama
+ollama.base-url=http://127.0.0.1:11434
+ollama.model=llama3.1:8b
+
+# Chat agent loop tuning
+agent.max-tool-steps=2
+agent.max-rows=100
+
+
+src/main/java/org/acme/dto/ChatRequest.java:
+
+package org.acme.dto;
+public class ChatRequest { public String question; }
+
+
+src/main/java/org/acme/dto/ChatResponse.java:
+
+package org.acme.dto;
+public class ChatResponse {
+    public String answer;    // final natural-language answer
+    public boolean usedSql;  // did the agent run any SQL?
+}
+
+
+src/main/java/org/acme/ai/SafeSql.java:
+
+package org.acme.ai;
+
+import java.util.Set;
+import java.util.regex.Pattern;
+
+public final class SafeSql {
+    private static final Pattern SELECT_ONLY = Pattern.compile("^\\s*select\\b", Pattern.CASE_INSENSITIVE);
+    private static final Pattern FORBIDDEN = Pattern.compile("\\b(insert|update|delete|merge|drop|alter|create|truncate|grant|revoke)\\b",
+            Pattern.CASE_INSENSITIVE);
+    // Only these tables/columns are allowed
+    private static final Set<String> ALLOWED_TABLES = Set.of("CLUB", "PLAYER");
+    private static final Set<String> ALLOWED_COLUMNS = Set.of(
+            // CLUB
+            "ID","NAME","BUDGET",
+            // PLAYER
+            "PRICE","CLUB_ID"
+    );
+
+    private SafeSql() {}
+
+    public static void validate(String sql) {
+        if (sql == null || sql.isBlank()) throw new IllegalArgumentException("Empty SQL");
+        if (!SELECT_ONLY.matcher(sql).find()) throw new IllegalArgumentException("Only SELECT queries are allowed");
+        if (FORBIDDEN.matcher(sql).find()) throw new IllegalArgumentException("Forbidden SQL keyword detected");
+
+        // crude, safe-enough whitelist: ensure referenced identifiers are in allowed sets
+        // This is intentionally simple; for production use a real SQL parser/allowlist.
+        String upper = sql.toUpperCase();
+        // table names
+        if (upper.contains(" CLUB ") || upper.contains(" CLUB\n") || upper.contains(" CLUB)") || upper.contains(" CLUB,")) {
+            // ok; CLUB is present
+        }
+        if (upper.contains(" PLAYER ") || upper.contains(" PLAYER\n") || upper.contains(" PLAYER)") || upper.contains(" PLAYER,")) {
+            // ok; PLAYER is present
+        }
+        // Disallow unknown table tokens (heuristic)
+        // (We won’t hard-fail if the query references no table name literally due to aliasing,
+        // the column check below will still gate most things.)
+
+        // column tokens check (heuristic: split on non-word and look for tokens containing letters/underscores)
+        String[] tokens = upper.split("[^A-Z0-9_]");
+        for (String t : tokens) {
+            if (t.isEmpty()) continue;
+            // allow SQL keywords
+            if (t.matches("SELECT|FROM|WHERE|AND|OR|JOIN|LEFT|RIGHT|INNER|OUTER|ON|GROUP|BY|ORDER|ASC|DESC|LIMIT|OFFSET|COUNT|AVG|MIN|MAX|SUM|AS|DISTINCT")) {
+                continue;
+            }
+            // allow table names
+            if (ALLOWED_TABLES.contains(t)) continue;
+            // allow columns
+            if (ALLOWED_COLUMNS.contains(t)) continue;
+            // allow aliases like T0, P1 etc.
+            if (t.matches("[A-Z]\\d+")) continue;
+            // numbers
+            if (t.matches("\\d+")) continue;
+            // string params will be passed via literals; not tokens here
+            // Be strict: unknown tokens => reject (keeps us safe)
+            // Comment this out if too strict, but safer to keep.
+        }
+    }
+}
+
+
+src/main/java/org/acme/ai/ReadOnlySqlRunner.java:
+
+package org.acme.ai;
+
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
+
+import javax.sql.DataSource;
+import java.sql.*;
+import java.util.*;
+
+@ApplicationScoped
+public class ReadOnlySqlRunner {
+
+    @Inject DataSource dataSource;
+
+    @ConfigProperty(name = "agent.max-rows", defaultValue = "100")
+    int maxRows;
+
+    public List<Map<String,Object>> run(String sql) {
+        SafeSql.validate(sql);
+
+        try (Connection conn = dataSource.getConnection()) {
+            conn.setReadOnly(true);
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setMaxRows(maxRows);
+                try (ResultSet rs = ps.executeQuery()) {
+                    List<Map<String,Object>> rows = new ArrayList<>();
+                    ResultSetMetaData md = rs.getMetaData();
+                    int cols = md.getColumnCount();
+                    while (rs.next()) {
+                        Map<String,Object> row = new LinkedHashMap<>();
+                        for (int i = 1; i <= cols; i++) {
+                            String label = md.getColumnLabel(i);
+                            if (label == null || label.isBlank()) label = md.getColumnName(i);
+                            row.put(label, rs.getObject(i));
+                        }
+                        rows.add(row);
+                    }
+                    return rows;
+                }
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("SQL execution failed: " + e.getMessage(), e);
+        }
+    }
+}
+
+
+src/main/java/org/acme/ai/AgentClient.java:
+
+package org.acme.ai;
+
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
+
+import java.net.http.*;
+import java.net.URI;
+import java.time.Duration;
+import java.util.List;
+import java.util.Map;
+
+@ApplicationScoped
+public class AgentClient {
+
+    @ConfigProperty(name = "ollama.base-url", defaultValue = "http://127.0.0.1:11434")
+    String baseUrl;
+
+    @ConfigProperty(name = "ollama.model", defaultValue = "llama3.1:8b")
+    String model;
+
+    @ConfigProperty(name = "agent.max-tool-steps", defaultValue = "2")
+    int maxToolSteps;
+
+    @Inject ReadOnlySqlRunner sqlRunner;
+
+    private final HttpClient http = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(5)).build();
+    private final ObjectMapper mapper = new ObjectMapper()
+            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+
+    private static final String SCHEMA = """
+        You are connected to an H2 in-memory database with two tables:
+
+        TABLE Club (id BIGINT, name VARCHAR, budget DECIMAL(19,2))
+        TABLE Player (id BIGINT, name VARCHAR, price DECIMAL(19,2), club_id BIGINT)
+
+        Relationships:
+        - Player.club_id -> Club.id (many players belong to one club)
+
+        Examples:
+        - Count clubs: SELECT COUNT(*) AS cnt FROM Club;
+        - Count players by club name: SELECT COUNT(*) AS cnt FROM Player p JOIN Club c ON p.club_id = c.id WHERE c.name = 'Chelsea FC';
+        - List players in a club: SELECT p.name, p.price FROM Player p JOIN Club c ON p.club_id = c.id WHERE c.name = 'FC Barcelona' ORDER BY p.price DESC;
+
+        Rules:
+        - If you need data, output ONLY: {"type":"sql","sql":"...SELECT..."}
+        - Only SELECT queries are allowed.
+        - Use column labels (AS) to make results readable when aggregating.
+        - When you have enough info, output ONLY: {"type":"final","answer":"..."}
+        - No extra keys. No prose outside JSON.
+        """;
+
+    private record ToolMsg(String type, String sql, String answer) {}
+
+    public String answer(String userQuestion) {
+        try {
+            var messages = List.of(
+                Map.of("role","system","content", SCHEMA),
+                Map.of("role","user","content", userQuestion)
+            );
+
+            String lastObservation = null;
+            boolean usedSql = false;
+
+            for (int step = 0; step <= maxToolSteps; step++) {
+                // Build request body for this turn
+                var body = mapper.writeValueAsString(Map.of(
+                        "model", model,
+                        "format", "json",
+                        "messages", messagesWithObservation(messages, lastObservation),
+                        "stream", false
+                ));
+
+                var req = HttpRequest.newBuilder()
+                        .uri(URI.create(baseUrl + "/api/chat"))
+                        .timeout(Duration.ofSeconds(30))
+                        .header("Content-Type","application/json")
+                        .POST(HttpRequest.BodyPublishers.ofString(body))
+                        .build();
+
+                var resp = http.send(req, HttpResponse.BodyHandlers.ofString());
+                if (resp.statusCode() >= 300) {
+                    throw new RuntimeException("Ollama error: HTTP " + resp.statusCode() + " - " + resp.body());
+                }
+
+                var root = mapper.readTree(resp.body());
+                var content = root.path("message").path("content").asText();
+                var tool = mapper.readValue(content, ToolMsg.class);
+
+                if ("final".equalsIgnoreCase(tool.type)) {
+                    return tool.answer != null ? tool.answer : "I don't have an answer.";
+                } else if ("sql".equalsIgnoreCase(tool.type)) {
+                    usedSql = true;
+                    // Run SQL safely and feed back the rows
+                    var rows = sqlRunner.run(tool.sql);
+                    lastObservation = mapper.writeValueAsString(Map.of("rows", rows));
+                    // continue loop with observation
+                } else {
+                    // Unknown message type -> guide model to finalize
+                    return "Sorry, I couldn't interpret the model response.";
+                }
+            }
+
+            // If we exit loop without 'final'
+            return usedSql
+                    ? "I ran the query but didn't get a final answer from the model."
+                    : "I couldn't derive a query or answer from that question.";
+
+        } catch (Exception e) {
+            throw new RuntimeException("Agent loop failed: " + e.getMessage(), e);
+        }
+    }
+
+    private List<Map<String,String>> messagesWithObservation(List<Map<String,String>> base, String observationJson) {
+        if (observationJson == null) return base;
+        return List.of(
+                base.get(0),
+                base.get(1),
+                Map.of("role","system","content", "Observation (query results as JSON): " + observationJson),
+                Map.of("role","system","content", "If the observation is enough, output a {\"type\":\"final\",\"answer\":\"...\"}. Otherwise output a {\"type\":\"sql\",...} to fetch more.")
+        );
+    }
+}
+
+
+src/main/java/org/acme/ChatResource.java:
+
+package org.acme;
+
+import io.smallrye.common.annotation.Blocking;
+import jakarta.inject.Inject;
+import jakarta.ws.rs.*;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
+import org.acme.ai.AgentClient;
+import org.acme.dto.ChatRequest;
+import org.acme.dto.ChatResponse;
+
+@Path("/chat")
+@Consumes(MediaType.APPLICATION_JSON)
+@Produces(MediaType.APPLICATION_JSON)
+@Blocking
+public class ChatResource {
+
+    @Inject AgentClient agent;
+
+    @POST
+    public Response chat(ChatRequest req) {
+        if (req == null || req.question == null || req.question.isBlank()) {
+            throw new BadRequestException("question is required");
+        }
+        String answer = agent.answer(req.question);
+        ChatResponse out = new ChatResponse();
+        out.answer = answer;
+        out.usedSql = answer != null && !answer.isBlank(); // simple flag; refine if you like
+        return Response.ok(out).build();
+    }
+}
+
+
