@@ -3137,3 +3137,108 @@ LLM content 2: {
   "Assistant": "Here is a list of some of the notable current players for FC Barcelona as of my last update: (Please note that rosters can change frequently, so it's best to check the latest updates.)"
 
   }
+
+
+
+private static final String SCHEMA = """
+You answer questions about a small football DB.
+
+SCHEMA
+- TABLE Club (id BIGINT, name VARCHAR, budget DECIMAL(19,2))
+- TABLE Player (id BIGINT, name VARCHAR, price DECIMAL(19,2), club_id BIGINT)
+- Relation: Player.club_id -> Club.id
+
+STRICT OUTPUT (valid JSON only; no code fences; no prose)
+- If you need database data, respond ONLY:
+  {"type":"sql","sql":"<a single SELECT using only Club and/or Player>"}
+- When you can answer, respond ONLY:
+  {"type":"final","answer":"<natural language answer>"}
+
+RULES
+- Only SELECT queries. Never INSERT/UPDATE/DELETE/DDL.
+- Join on p.club_id = c.id when needed (Player p JOIN Club c ON p.club_id = c.id).
+- If an exact match may fail (e.g., "Barcelona" vs "FC Barcelona"), try a case-insensitive LIKE, e.g.:
+  SELECT p.name, p.price
+  FROM Player p JOIN Club c ON p.club_id = c.id
+  WHERE UPPER(c.name) LIKE UPPER('%Barcelona%')
+  ORDER BY p.price DESC;
+- Keep SQL simple. You may use aliases like SELECT COUNT(*) AS cnt.
+""";
+
+
+var body = mapper.writeValueAsString(Map.of(
+    "model", model,
+    "format", "json",
+    "messages", messagesWithObservation(messages, lastObservation),
+    "options", Map.of("temperature", 0, "top_p", 1),
+    "stream", false
+));
+
+
+
+private List<Map<String,String>> messagesWithObservation(List<Map<String,String>> base, String observationJson) {
+    if (observationJson == null) return base;
+    return List.of(
+        base.get(0), // system: SCHEMA
+        base.get(1), // user: original question
+        Map.of("role","user","content",
+            "Observation (query results as JSON): " + observationJson + "\n" +
+            "STRICT OUTPUT AGAIN (valid JSON only; no prose):\n" +
+            "- If you need more data, respond ONLY: {\"type\":\"sql\",\"sql\":\"...\"}\n" +
+            "- If you can answer now, respond ONLY: {\"type\":\"final\",\"answer\":\"...\"}")
+    );
+}
+
+
+
+package org.acme.ai;
+
+import java.util.regex.Pattern;
+
+public final class SafeSql {
+    private static final Pattern SELECT_ONLY = Pattern.compile("^\\s*select\\b", Pattern.CASE_INSENSITIVE);
+    private static final Pattern FORBIDDEN = Pattern.compile("\\b(insert|update|delete|merge|drop|alter|create|truncate|grant|revoke)\\b", Pattern.CASE_INSENSITIVE);
+    private static final Pattern TABLE_WHITELIST = Pattern.compile("\\b(from|join)\\s+(Club|Player)\\b", Pattern.CASE_INSENSITIVE);
+
+    private SafeSql() {}
+
+    public static void validate(String sql) {
+        if (sql == null || sql.isBlank()) throw new IllegalArgumentException("Empty SQL");
+        String s = sql.trim();
+        if (!SELECT_ONLY.matcher(s).find()) throw new IllegalArgumentException("Only SELECT queries are allowed");
+        if (FORBIDDEN.matcher(s).find()) throw new IllegalArgumentException("Forbidden SQL keyword detected");
+        if (!TABLE_WHITELIST.matcher(s).find())
+            throw new IllegalArgumentException("Query must reference only the allowed tables (Club, Player).");
+    }
+}
+
+
+
+private String extractJsonObject(String content) {
+    content = content.strip();
+    if (content.startsWith("```")) {
+        int first = content.indexOf('{');
+        int last = content.lastIndexOf('}');
+        if (first >= 0 && last > first) return content.substring(first, last + 1);
+    }
+    // Fallback: try to find a JSON object by braces
+    int first = content.indexOf('{');
+    int last = content.lastIndexOf('}');
+    if (first >= 0 && last > first) {
+        String candidate = content.substring(first, last + 1).trim();
+        if (candidate.contains("\"type\"")) return candidate;
+    }
+    return content; // give mapper a shot; we'll handle parse error gracefully
+}
+
+
+
+content = extractJsonObject(content);
+ToolMsg tool;
+try {
+    tool = mapper.readValue(content, ToolMsg.class);
+} catch (Exception parseEx) {
+    return new AgentResult("Sorry, I couldn't interpret the model response.", usedSql);
+}
+
+
