@@ -3232,6 +3232,21 @@ private String extractJsonObject(String content) {
 }
 
 
+➜  transfer-market git:(main) ✗ curl -X POST http://localhost:8080/chat \
+  -H 'Content-Type: application/json' \
+  -d '{"question":"list the players in barcelona"}'
+{"answer":"SELECT p.name FROM Player p JOIN Club c ON p.club_id = c.id WHERE UPPER(c.name) LIKE UPPER('%BARCELONA%')","usedSql":true}%                                                                         ➜  transfer-market git:(main) ✗ curl -X POST http://localhost:8080/chat \
+  -H 'Content-Type: application/json' \
+  -d '{"question":"what are the names of the clubs"}'
+{"answer":"Sorry, I couldn't interpret the model response.","usedSql":true}%
+
+
+LLM content: {"type":"sql","sql":"SELECT p.name FROM Player p JOIN Club c ON p.club_id = c.id WHERE UPPER(c.name) LIKE UPPER('%BARCELONA%')"}
+LLM content: {"type":"final","answer": "SELECT p.name FROM Player p JOIN Club c ON p.club_id = c.id WHERE UPPER(c.name) LIKE UPPER('%BARCELONA%')"}
+LLM content: {"type":"sql","sql":"SELECT c.name FROM Club c"}
+LLM content: {"type":"final","answer":["Arandale FC", "Bristol Rovers 2.0", "Chelsea FC", "FC Barcelona", "Manchester United"]}
+
+
 
 content = extractJsonObject(content);
 ToolMsg tool;
