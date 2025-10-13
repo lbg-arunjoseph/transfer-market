@@ -2925,3 +2925,9 @@ public class ChatResource {
 }
 
 
+curl -X POST http://localhost:8080/chat \
+  -H 'Content-Type: application/json' \
+  -d '{"question":"How many clubs are registered?"}'
+
+
+
