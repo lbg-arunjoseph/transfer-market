@@ -457,3 +457,36 @@ INSERT INTO Player(id, name, price, club_id) VALUES (5, 'Mason Mount', 60000000.
 INSERT INTO Player(id, name, price, club_id) VALUES (6, 'Raheem Sterling', 65000000.00, 4);
 INSERT INTO Player(id, name, price, club_id) VALUES (7, 'Robert Lewandowski', 85000000.00, 5);
 INSERT INTO Player(id, name, price, club_id) VALUES (8, 'Pedri', 75000000.00, 5);
+
+"You are an expert software engineer well versed particularly in the technoogies of java 21, quarkus, ollama and gradle. I am building a project using these tools and technologies on my m4 mac machine.The project I have currently implemented simulates a very basic football transfer market with a in memory database which gets seeded with pre-set data every time I run the project. Here are the table schemes of the entities in my project: clubs and players.@Entity                                                      // Marks this as a JPA entity (mapped to a table)
+ public class Club extends PanacheEntity {                    // Extends PanacheEntity => gets a Long id and helpers
+
+     @Column(nullable = false, unique = true)
+     public String name;
+
+     @Column(nullable = false, precision = 19, scale = 2)
+     public BigDecimal budget;
+
+     @OneToMany(mappedBy = "club",                            // players reference their club; 'club' is the owner side
+             cascade = CascadeType.ALL,                    // propagate saves/deletes to players
+             orphanRemoval = true)                         // remove players if they’re de-linked
+     public List<Player> players;                             // list of players for this club
+ }@Entity                                                      // This becomes a table 'Player'
+ public class Player extends PanacheEntity {                   // id (Long) provided by PanacheEntity
+
+     @Column(nullable = false)                                 // must have a name
+     public String name;
+
+     @Column(nullable = false, precision = 19, scale = 2)      // price (e.g., 74300000.00)
+     public BigDecimal price;
+
+     @ManyToOne(optional = false, fetch = FetchType.LAZY)      // many players belong to a single club
+     @JoinColumn(name = "club_id")                             // FK column in Player table
+     @JsonIgnore                                               // hide to prevent recursion when serialising JSON
+     public Club club;
+
+     @JsonProperty("clubId")                                   // expose 'clubId' in JSON while keeping 'club' ignored
+     public Long jsonClubId() {
+         return club == null ? null : club.id;                 // compute club id for clients
+     }
+ }The way a transfer of a player can happen is when a request is sent including the buyer club, seller club, and player involved in the transfer. If the budget of the buyer club is more than the price of the player, the transfer goes through. If not, the transfer in unsuccessful. Once a transfer goes through successfully, the buyer club's budget is then reduced by the price of the player that was purchased, and the seller club's budget increases by this amount.I want to include a functionality where the user of the program and access an endpoint to chat with a model hosted locally on my machine using ollama. The user should be able to ask questions like 'how many clubs are registered?', 'how many players does club X have?', 'Name all the players in club Y', etc. The LLM of choice should then be able to accurately access the relevant information (stored in the in memory database I assume), make sense of it and return the correct answer to the user's question. Run me through how this can be implemented for my project explaining every step of the way like I am a beginner in this space."
