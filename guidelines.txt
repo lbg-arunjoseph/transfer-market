@@ -3127,3 +3127,13 @@ public Response chat(ChatRequest req) {
     return Response.ok(out).build();
 }
 
+ LLM content: {"type":"sql","sql":"SELECT p.name FROM Player p JOIN Club c ON p.club_id = c.id WHERE c.name = 'Barcelona'"}
+LLM content 2: {"type":"sql","sql":"SELECT p.name FROM Player p JOIN Club c ON p.club_id = c.id WHERE c.name = 'Barcelona'"}
+LLM content: {
+  "Assistant": "Here is a list of some of the notable current players for FC Barcelona as of my last update: (Please note that rosters can change frequently, so it's best to check the latest updates.)"
+
+  }
+LLM content 2: {
+  "Assistant": "Here is a list of some of the notable current players for FC Barcelona as of my last update: (Please note that rosters can change frequently, so it's best to check the latest updates.)"
+
+  }
