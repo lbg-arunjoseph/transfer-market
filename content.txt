@@ -1,35 +1,46 @@
-===== /Users/arun-joy.joseph/IdeaProjects/transfer-market/src/main/java/org/acme/dto/CreatePlayerRequest.java =====
+=====org/acme/dto/CreatePlayerRequest.java=====
+
+
 package org.acme.dto;
 import java.math.BigDecimal;
 
-public class CreatePlayerRequest {         // maps incoming JSON when creating a player
-    public String name;                    // player name
-    public BigDecimal price;               // asking price
-    public Long clubId;                    // which club owns him initially
+public class CreatePlayerRequest {
+    public String name;
+    public BigDecimal price;
+    public Long clubId;
 }
 
-===== /Users/arun-joy.joseph/IdeaProjects/transfer-market/src/main/java/org/acme/dto/CreateClubRequest.java =====
-package org.acme.dto;
 
-import java.math.BigDecimal;
+=====org/acme/dto/CreateClubRequest.java=====
 
-public class CreateClubRequest {           // maps incoming JSON when creating a club
-    public String name;                    // club name
-    public BigDecimal budget;              // starting budget
-}
-===== /Users/arun-joy.joseph/IdeaProjects/transfer-market/src/main/java/org/acme/dto/TransferRequest.java =====
-package org.acme.dto;
 
-public class TransferRequest {             // maps the transfer command
-    public Long buyerClubId;               // club that wants to buy
-    public Long playerId;                  // player being bought
-}
-===== /Users/arun-joy.joseph/IdeaProjects/transfer-market/src/main/java/org/acme/dto/TransferResult.java =====
 package org.acme.dto;
 
 import java.math.BigDecimal;
 
-public class TransferResult {              // response after transfer
+public class CreateClubRequest {
+    public String name;
+    public BigDecimal budget;
+}
+
+=====org/acme/dto/TransferRequest.java=====
+
+
+package org.acme.dto;
+
+public class TransferRequest {
+    public Long buyerClubId;
+    public Long playerId;
+}
+
+=====org/acme/dto/TransferResult.java=====
+
+
+package org.acme.dto;
+
+import java.math.BigDecimal;
+
+public class TransferResult {
     public Long playerId;
     public String playerName;
     public String fromClub;
@@ -38,127 +49,11 @@ public class TransferResult {              // response after transfer
     public BigDecimal buyerBudgetAfter;
     public BigDecimal sellerBudgetAfter;
 }
-===== /Users/arun-joy.joseph/IdeaProjects/transfer-market/src/main/java/org/acme/chat/ChatResource.java =====
-package org.acme.chat;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import jakarta.inject.Inject;
-import jakarta.transaction.Transactional;
-import jakarta.ws.rs.*;
-import jakarta.ws.rs.core.MediaType;
-import jakarta.ws.rs.core.Response;
-import org.acme.chat.ChatDtos.*;
 
-import static org.acme.chat.Prompts.schemaCard;
-import static org.acme.chat.Prompts.verbaliseCard;
+=====org/acme/chat/SqlRunner.java=====
 
-@Path("/chat")
-@Consumes(MediaType.APPLICATION_JSON)
-@Produces(MediaType.APPLICATION_JSON)
-public class ChatResource {
 
-    @Inject
-    OllamaClient llm;
-
-    @Inject
-    SqlRunner sqlRunner;
-
-    @Inject
-    ObjectMapper mapper;
-
-    @POST
-    @Transactional(Transactional.TxType.REQUIRED) // read-only work fits in a tx for consistency
-    public Response chat(ChatRequest req) {
-        if (req == null || req.question == null || req.question.isBlank()) {
-            throw new BadRequestException("question is required");
-        }
-
-        try {
-            // Step 1: get plan (sql or final)
-            String planJson = llm.chat(schemaCard(), req.question.trim());
-
-            LlmPlan plan = mapper.readValue(planJson, LlmPlan.class);
-            if (plan.type == null) throw new WebApplicationException("Model returned an invalid plan", 502);
-
-            if ("final".equalsIgnoreCase(plan.type)) {
-                var out = new ChatResponse();
-                out.answer = plan.answer == null ? "(no answer)" : plan.answer;
-                out.usedSql = false;
-                return Response.ok(out).build();
-            }
-
-            if (!"sql".equalsIgnoreCase(plan.type) || plan.sql == null || plan.sql.isBlank()) {
-                throw new WebApplicationException("Model did not return a SQL plan", 502);
-            }
-
-            // Guardrails and run
-            sqlRunner.validateReadOnly(plan.sql);
-            String safeSql = sqlRunner.enforceLimit(plan.sql);
-            var rows = sqlRunner.runNative(safeSql);
-
-            // Step 2: verbalise results
-            String verbaliseUserMsg = "Question: " + req.question.trim() + "\n"
-                    + "Columns: " + mapper.writeValueAsString(rows.columns) + "\n"
-                    + "Rows: " + mapper.writeValueAsString(rows.rows);
-
-            String finalJson = llm.chat(verbaliseCard(), verbaliseUserMsg);
-            LlmPlan finalPlan = mapper.readValue(finalJson, LlmPlan.class);
-            if (!"final".equalsIgnoreCase(finalPlan.type)) {
-                throw new WebApplicationException("Model did not return a final answer", 502);
-            }
-
-            var out = new ChatResponse();
-            out.answer = finalPlan.answer;
-            out.usedSql = true;
-            out.sql = safeSql;
-            out.rows = rows;
-            return Response.ok(out).build();
-
-        } catch (Exception e) {
-            var out = new ChatResponse();
-            out.error = e.getMessage();
-            return Response.status(Response.Status.BAD_GATEWAY).entity(out).build();
-        }
-    }
-}
-===== /Users/arun-joy.joseph/IdeaProjects/transfer-market/src/main/java/org/acme/chat/Prompts.java =====
-package org.acme.chat;
-
-public class Prompts {
-
-    public static String schemaCard() {
-        return String.join("\n",
-                "You are a helpful data assistant for a football transfer app.",
-                "You can only produce JSON with this schema: {\"type\":\"sql\",\"sql\":\"...\"} OR {\"type\":\"final\",\"answer\":\"...\"}.",
-                "Never include any extra text outside JSON.",
-                "",
-                "Database schema (H2):",
-                "Table Club columns: id BIGINT, name VARCHAR, budget DECIMAL(19,2)",
-                "Table Player columns: id BIGINT, name VARCHAR, price DECIMAL(19,2), club_id BIGINT",
-                "Join rule: Player.club_id = Club.id",
-                "",
-                "Rules:",
-                "- Only produce read-only SELECT queries. Never modify data.",
-                "- Prefer case-insensitive name matching using UPPER(name) LIKE UPPER('%TERM%').",
-                "- If the user asks for counts, use COUNT(*).",
-                "- Use simple SQL that H2 supports.",
-                "- Keep queries small; avoid selecting too many columns when not needed.",
-                "- If the user question is already directly answerable without SQL, return {\"type\":\"final\",\"answer\":\"...\"}.",
-                "- Otherwise return {\"type\":\"sql\",\"sql\":\"...\"}.",
-                ""
-        );
-    }
-
-    public static String verbaliseCard() {
-        return String.join("\n",
-                "You are turning SQL result rows into a single concise natural-language answer.",
-                "Only produce JSON with {\"type\":\"final\",\"answer\":\"...\"}. No extra text.",
-                "If there are no rows, say that nothing was found.",
-                "If the question was for a list, join items with commas in a single sentence."
-        );
-    }
-}
-===== /Users/arun-joy.joseph/IdeaProjects/transfer-market/src/main/java/org/acme/chat/SqlRunner.java =====
 package org.acme.chat;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -171,6 +66,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.regex.Pattern;
 
 import static org.acme.chat.ChatDtos.SqlResultForLlm;
@@ -228,28 +124,55 @@ public class SqlRunner {
         List<String> columns = new ArrayList<>();
         List<List<Object>> rows = new ArrayList<>();
 
-        // Try to fetch column names via unwrap to org.hibernate.query.NativeQuery if available
-//        try {
-//            var nativeQuery = q.unwrap(org.hibernate.query.NativeQuery.class);
-//            var metas = nativeQuery.getReturnAliases();
-//            if (metas != null) {
-//                columns = Arrays.asList(metas);
-//            }
-//        } catch (Exception ignore) {}
+        String up = sql.toUpperCase(Locale.ROOT);
+        boolean isClub = up.contains("FROM CLUB");
+        boolean isPlayer = up.contains("FROM PLAYER");
 
-        // Fallback: if we have no columns metadata, infer length from first row
-        if (result.isEmpty()) {
-            Object first = result.get(0);
-            int width = (first instanceof Object[]) ? ((Object[]) first).length : 1;
-            for (int i = 0; i < width; i++) columns.add("col" + (i + 1));
+        // If result is not empty and first row is Object[], infer columns by count
+        if (!result.isEmpty() && result.get(0) instanceof Object[]) {
+            int width = ((Object[]) result.get(0)).length;
+            if (isClub && width == CLUB_COLUMNS.size()) {
+                columns = new ArrayList<>(CLUB_COLUMNS);
+            } else if (isPlayer && width == PLAYER_COLUMNS.size()) {
+                columns = new ArrayList<>(PLAYER_COLUMNS);
+            } else {
+                for (int i = 0; i < width; i++) columns.add("col" + (i + 1));
+            }
+        } else if (!result.isEmpty()) {
+            // Single column result
+            if (isClub) {
+                columns = List.of(CLUB_COLUMNS.get(0));
+            } else if (isPlayer) {
+                columns = List.of(PLAYER_COLUMNS.get(0));
+            } else {
+                columns = List.of("col1");
+            }
+        } else {
+            // No results, fallback to table columns if possible
+            if (isClub) {
+                columns = new ArrayList<>(CLUB_COLUMNS);
+            } else if (isPlayer) {
+                columns = new ArrayList<>(PLAYER_COLUMNS);
+            }
         }
 
-        for (Object row : (List<Object>) result) {
+        for (Object row : result) {
+            List<Object> rowList = new ArrayList<>();
             if (row instanceof Object[]) {
-                rows.add(Arrays.asList((Object[]) row));
+                Object[] arr = (Object[]) row;
+                for (int i = 0; i < columns.size() && i < arr.length; i++) {
+                    rowList.add(arr[i]);
+                }
+            } else if (row instanceof Map) {
+                Map<?,?> mapRow = (Map<?,?>) row;
+                for (String col : columns) {
+                    rowList.add(mapRow.get(col));
+                }
             } else {
-                rows.add(List.of(row));
+                // Single column result
+                rowList.add(row);
             }
+            rows.add(rowList);
         }
 
         var out = new SqlResultForLlm();
@@ -258,230 +181,156 @@ public class SqlRunner {
         return out;
     }
 }
-===== /Users/arun-joy.joseph/IdeaProjects/transfer-market/src/main/java/org/acme/chat/OllamaClient.java =====
+
+
+=====org/acme/chat/SqlResource.java=====
+
+
 package org.acme.chat;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
-import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import org.eclipse.microprofile.config.inject.ConfigProperty;
-
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.time.Duration;
+import jakarta.ws.rs.*;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
+import io.smallrye.common.annotation.Blocking;
+import java.util.Map;
 import java.util.List;
+import java.util.ArrayList;
 
-import static org.acme.chat.ChatDtos.*;
-
-@ApplicationScoped
-public class OllamaClient {
-
-    @ConfigProperty(name = "ollama.base-url", defaultValue = "http://localhost:11434")
-    String baseUrl;
-
-    @ConfigProperty(name = "ollama.model", defaultValue = "mistral:latest")
-    String model;
-
-    @ConfigProperty(name = "ollama.connect-timeout", defaultValue = "5000")
-    int connectTimeoutMs;
-
-    @ConfigProperty(name = "ollama.read-timeout", defaultValue = "30000")
-    int readTimeoutMs;
+@Path("/sql")
+@Consumes(MediaType.APPLICATION_JSON)
+@Produces(MediaType.APPLICATION_JSON)
+public class SqlResource {
 
     @Inject
-    ObjectMapper mapper;
+    SqlRunner sqlRunner;
 
-    HttpClient client;
-
-    void ensureClient() {
-        if (client == null) {
-            client = HttpClient.newBuilder()
-                    .connectTimeout(Duration.ofMillis(connectTimeoutMs))
+    @POST
+    @Blocking // Ensure DB access is on a worker thread
+    public Response runSql(Map<String, String> body) {
+        String sql = body.get("sql");
+        if (sql == null || sql.isBlank()) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity(Map.of("error", "Missing 'sql' field in request body"))
+                    .build();
+        }
+        try {
+            // Validate and enforce limit
+            sqlRunner.validateReadOnly(sql);
+            String safeSql = sqlRunner.enforceLimit(sql);
+            // Run the query
+            var result = sqlRunner.runNative(safeSql);
+            // Convert columns and rows to a list of maps
+            List<Map<String, Object>> rows = new ArrayList<>();
+            for (List<Object> row : result.rows) {
+                Map<String, Object> rowMap = new java.util.LinkedHashMap<>();
+                for (int i = 0; i < result.columns.size(); i++) {
+                    rowMap.put(result.columns.get(i), row.get(i));
+                }
+                rows.add(rowMap);
+            }
+            return Response.ok(Map.of("rows", rows)).build();
+        } catch (IllegalArgumentException e) {
+            // For validation errors (e.g., non-SELECT statement)
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity(Map.of("error", e.getMessage()))
+                    .build();
+        } catch (Exception e) {
+            // For all other errors
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity(Map.of("error", e.getMessage()))
                     .build();
         }
     }
-
-    public String chat(String systemPrompt, String userPrompt) throws Exception {
-        ensureClient();
-
-        var req = new OllamaChatRequest();
-        req.model = model;
-        req.stream = false;
-        req.messages = List.of(
-                new OllamaMessage("system", systemPrompt),
-                new OllamaMessage("user", userPrompt)
-        );
-
-        var body = mapper.writeValueAsString(req);
-
-        var httpReq = HttpRequest.newBuilder()
-                .uri(URI.create(baseUrl + "/api/chat"))
-                .timeout(Duration.ofMillis(readTimeoutMs))
-                .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(body))
-                .build();
-
-        var resp = client.send(httpReq, HttpResponse.BodyHandlers.ofString());
-        if (resp.statusCode() >= 300) {
-            throw new RuntimeException("Ollama error: HTTP " + resp.statusCode() + " body=" + resp.body());
-        }
-
-        // Ollama returns: {"message":{"role":"assistant","content":"..."},"done":true,...}
-        var node = (ObjectNode) mapper.readTree(resp.body());
-        var msg = node.path("message").path("content").asText(null);
-        if (msg == null) {
-            // Fallback older shapes
-            msg = node.path("content").asText(null);
-        }
-        if (msg == null) {
-            throw new RuntimeException("Could not parse Ollama response message");
-        }
-        return msg;
-    }
 }
-===== /Users/arun-joy.joseph/IdeaProjects/transfer-market/src/main/java/org/acme/chat/ChatDtos.java =====
-package org.acme.chat;
 
-import java.util.List;
-import java.util.Map;
 
-public class ChatDtos {
+=====org/acme/ClubResource.java=====
 
-    public static class ChatRequest {
-        public String question;
-    }
 
-    public static class ChatResponse {
-        public String answer;
-        public boolean usedSql;
-        public String sql;           // optional, for debugging
-        public Object rows;          // optional, echo rows we used
-        public String error;         // optional
-    }
-
-    // Internal DTOs to talk to Ollama /api/chat
-    public static class OllamaMessage {
-        public String role;
-        public String content;
-        public OllamaMessage() {}
-        public OllamaMessage(String role, String content) { this.role = role; this.content = content; }
-    }
-
-    public static class OllamaChatRequest {
-        public String model;
-        public List<OllamaMessage> messages;
-        public boolean stream = false;
-        public Map<String,Object> options; // optional tuning
-    }
-
-    public static class OllamaChatResponse {
-        public String model;
-        public String created_at;
-        public List<Choice> message; // NOTE: Ollama returns a single message object in newer APIs; we’ll parse content safely
-        public String done_reason;
-        public boolean done;
-        // We only need the assistant message content; to be robust, we'll map a minimal structure:
-        public AssistantMessage messageObj;
-        public static class Choice { public String content; }
-        public static class AssistantMessage { public String role; public String content; }
-    }
-
-    // The strict JSON the model should return to us
-    public static class LlmPlan {
-        public String type;  // "sql" or "final"
-        public String sql;
-        public String answer;
-    }
-
-    public static class SqlResultForLlm {
-        public List<String> columns;
-        public List<List<Object>> rows;
-    }
-}
-===== /Users/arun-joy.joseph/IdeaProjects/transfer-market/src/main/java/org/acme/ClubResource.java =====
 package org.acme;
 
-import org.acme.dto.CreateClubRequest;                      // DTO for POST
-import io.smallrye.common.annotation.Blocking;                          // mark blocking endpoints (JPA is blocking)
-import jakarta.transaction.Transactional;                                // for DB writes
-import jakarta.ws.rs.*;                                                  // JAX-RS annotations
-import jakarta.ws.rs.core.MediaType;                                     // content types
-import jakarta.ws.rs.core.Response;                                      // HTTP response wrapper
-import java.math.BigDecimal;                                             // validation for budget
-import java.util.List;                                                   // list for GET all
-import java.util.Optional;                                               // for findByIdOptional
+import org.acme.dto.CreateClubRequest;
+import io.smallrye.common.annotation.Blocking;
+import jakarta.transaction.Transactional;
+import jakarta.ws.rs.*;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.Optional;
 
-@Path("/clubs")                                                          // base path for club API
-@Consumes(MediaType.APPLICATION_JSON)                                    // accept JSON
-@Produces(MediaType.APPLICATION_JSON)                                    // return JSON
-@Blocking                                                                 // ensure handled on worker thread (JPA)
+@Path("/clubs")
+@Consumes(MediaType.APPLICATION_JSON)
+@Produces(MediaType.APPLICATION_JSON)
+@Blocking
 public class ClubResource {
 
-    @GET                                                                 // GET /clubs
-    public List<Club> list() {                                           // list all clubs
-        return Club.listAll();                                           // Panache helper -> SELECT * FROM Club
+    @GET
+    public List<Club> list() {
+        return Club.listAll();
     }
 
     @GET
-    @Path("/{id}")                                                       // GET /clubs/{id}
-    public Club get(@PathParam("id") Long id) {                          // read one club
-        return Club.<Club>findByIdOptional(id)                                 // returns Optional<Club>
+    @Path("/{id}")
+    public Club get(@PathParam("id") Long id) {
+        return Club.<Club>findByIdOptional(id)
                 .orElseThrow(() -> new NotFoundException("Club not found: " + id));
     }
 
-    @POST                                                                // POST /clubs
-    @Transactional                                                       // wrap in transaction for DB write
-    public Response create(CreateClubRequest req) {                      // JSON request body mapped to DTO
+    @POST
+    @Transactional
+    public Response create(CreateClubRequest req) {
         if (req == null || req.name == null || req.name.isBlank())
             throw new BadRequestException("name is required");
         if (req.budget == null || req.budget.compareTo(BigDecimal.ZERO) < 0)
             throw new BadRequestException("budget must be >= 0");
 
-        Club c = new Club();                                             // new entity
-        c.name = req.name.trim();                                        // set name
-        c.budget = req.budget;                                           // set budget
-        c.persist();                                                     // INSERT into DB
+        Club c = new Club();
+        c.name = req.name.trim();
+        c.budget = req.budget;
+        c.persist();
 
-        return Response                                                  // HTTP 201 + created entity
+        return Response
                 .status(Response.Status.CREATED)
                 .entity(c)
                 .build();
     }
 }
-===== /Users/arun-joy.joseph/IdeaProjects/transfer-market/src/main/java/org/acme/PlayerResource.java =====
+
+=====org/acme/PlayerResource.java=====
+
+
 package org.acme;
 
 import org.acme.dto.CreatePlayerRequest;
-import io.smallrye.common.annotation.Blocking;                           // blocking (JPA)
-import jakarta.transaction.Transactional;                                 // DB write boundary
-import jakarta.ws.rs.*;                                                   // JAX-RS
-import jakarta.ws.rs.core.MediaType;                                      // JSON content-type
-import jakarta.ws.rs.core.Response;                                       // HTTP responses
-import java.math.BigDecimal;                                              // for price checks
-import java.util.List;                                                    // list endpoint
+import io.smallrye.common.annotation.Blocking;
+import jakarta.transaction.Transactional;
+import jakarta.ws.rs.*;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
+import java.math.BigDecimal;
+import java.util.List;
 
-@Path("/players")                                                         // base path for player API
+@Path("/players")
 @Consumes(MediaType.APPLICATION_JSON)
 @Produces(MediaType.APPLICATION_JSON)
 @Blocking
 public class PlayerResource {
 
-    @GET                                                                  // GET /players
+    @GET
     public List<Player> list() {
-        return Player.listAll();                                          // SELECT * FROM Player
+        return Player.listAll();
     }
 
     @GET
-    @Path("/{id}")                                                        // GET /players/{id}
+    @Path("/{id}")
     public Player get(@PathParam("id") Long id) {
         return Player.<Player>findByIdOptional(id)
                 .orElseThrow(() -> new NotFoundException("Player not found: " + id));
     }
 
-    @POST                                                                 // POST /players
+    @POST
     @Transactional
     public Response create(CreatePlayerRequest req) {
         if (req == null || req.name == null || req.name.isBlank())
@@ -491,60 +340,62 @@ public class PlayerResource {
         if (req.clubId == null)
             throw new BadRequestException("clubId is required");
 
-        Club club = Club.<Club>findByIdOptional(req.clubId)                     // resolve owning club
+        Club club = Club.<Club>findByIdOptional(req.clubId)
                 .orElseThrow(() -> new NotFoundException("clubId not found: " + req.clubId));
 
-        Player p = new Player();                                          // new player
-        p.name = req.name.trim();                                         // set fields
+        Player p = new Player();
+        p.name = req.name.trim();
         p.price = req.price;
-        p.club = club;                                                    // link to owner club
-        p.persist();                                                      // INSERT
+        p.club = club;
+        p.persist();
 
-        return Response.status(Response.Status.CREATED).entity(p).build();// return 201
+        return Response.status(Response.Status.CREATED).entity(p).build();
     }
 }
-===== /Users/arun-joy.joseph/IdeaProjects/transfer-market/src/main/java/org/acme/TransferService.java =====
+
+=====org/acme/TransferService.java=====
+
+
 package org.acme;
 
-import org.acme.dto.TransferResult;                 // response DTO
-import jakarta.enterprise.context.ApplicationScoped;            // CDI bean (one per app)
-import jakarta.transaction.Transactional;                       // wrap transfer in a transaction
-import jakarta.ws.rs.BadRequestException;                       // 400 on invalid request
-import jakarta.ws.rs.NotFoundException;                         // 404 when entity missing
-import java.math.BigDecimal;                                    // money operations
+import org.acme.dto.TransferResult;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.transaction.Transactional;
+import jakarta.ws.rs.BadRequestException;
+import jakarta.ws.rs.NotFoundException;
+import java.math.BigDecimal;
 
-@ApplicationScoped                                               // managed bean
+@ApplicationScoped
 public class TransferService {
 
-    @Transactional                                              // all DB changes happen atomically
+    @Transactional
     public TransferResult transfer(Long buyerClubId, Long playerId) {
         if (buyerClubId == null || playerId == null)
             throw new BadRequestException("buyerClubId and playerId are required");
 
-        Club buyer = Club.<Club>findByIdOptional(buyerClubId)         // fetch buyer
+        Club buyer = Club.<Club>findByIdOptional(buyerClubId)
                 .orElseThrow(() -> new NotFoundException("Buyer club not found: " + buyerClubId));
 
-        Player player = Player.<Player>findByIdOptional(playerId)       // fetch player
+        Player player = Player.<Player>findByIdOptional(playerId)
                 .orElseThrow(() -> new NotFoundException("Player not found: " + playerId));
 
-        Club seller = player.club;                              // current owner
+        Club seller = player.club;
         if (seller == null)
             throw new BadRequestException("Player has no current club");
         if (seller.id.equals(buyer.id))
             throw new BadRequestException("Buyer already owns this player");
 
-        BigDecimal price = player.price;                        // agreed price
-        if (buyer.budget.compareTo(price) < 0)                  // can buyer afford?
+        BigDecimal price = player.price;
+        if (buyer.budget.compareTo(price) < 0)
             throw new BadRequestException("Buyer cannot afford this player");
 
         // Money moves: buyer pays, seller receives
-        buyer.budget = buyer.budget.subtract(price);            // deduct from buyer
-        seller.budget = seller.budget.add(price);               // add to seller
+        buyer.budget = buyer.budget.subtract(price);
+        seller.budget = seller.budget.add(price);
 
         // Transfer registration
-        player.club = buyer;                                    // change ownership
+        player.club = buyer;
 
-        // No explicit persist() needed: entities are managed in a transaction.
 
         // result payload
         TransferResult result = new TransferResult();
@@ -556,10 +407,13 @@ public class TransferService {
         result.buyerBudgetAfter = buyer.budget;
         result.sellerBudgetAfter = seller.budget;
 
-        return result;                                          // returned as JSON by resource
+        return result;
     }
 }
-===== /Users/arun-joy.joseph/IdeaProjects/transfer-market/src/main/java/org/acme/GreetingResource.java =====
+
+=====org/acme/GreetingResource.java=====
+
+
 package org.acme;
 
 import jakarta.ws.rs.GET;
@@ -577,35 +431,41 @@ public class GreetingResource {
     }
 }
 
-===== /Users/arun-joy.joseph/IdeaProjects/transfer-market/src/main/java/org/acme/Player.java =====
-package org.acme; // package groups related classes
 
-import com.fasterxml.jackson.annotation.JsonIgnore;           // to avoid infinite JSON loops with bidirectional links
-import com.fasterxml.jackson.annotation.JsonProperty;         // to expose computed fields
-import io.quarkus.hibernate.orm.panache.PanacheEntity;        // Panache base
-import jakarta.persistence.*;                                 // JPA
-import java.math.BigDecimal;                                  // money
+=====org/acme/Player.java=====
 
-@Entity                                                      // This becomes a table 'Player'
-public class Player extends PanacheEntity {                   // id (Long) provided by PanacheEntity
 
-    @Column(nullable = false)                                 // must have a name
+package org.acme;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import io.quarkus.hibernate.orm.panache.PanacheEntity;
+import jakarta.persistence.*;
+import java.math.BigDecimal;
+
+@Entity
+public class Player extends PanacheEntity {
+
+    @Column(nullable = false)
     public String name;
 
-    @Column(nullable = false, precision = 19, scale = 2)      // price (e.g., 74300000.00)
+    @Column(nullable = false, precision = 19, scale = 2)
     public BigDecimal price;
 
-    @ManyToOne(optional = false, fetch = FetchType.LAZY)      // many players belong to a single club
-    @JoinColumn(name = "club_id")                             // FK column in Player table
-    @JsonIgnore                                               // hide to prevent recursion when serialising JSON
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
+    @JoinColumn(name = "club_id")
+    @JsonIgnore
     public Club club;
 
-    @JsonProperty("clubId")                                   // expose 'clubId' in JSON while keeping 'club' ignored
+    @JsonProperty("clubId")
     public Long jsonClubId() {
-        return club == null ? null : club.id;                 // compute club id for clients
+        return club == null ? null : club.id;
     }
 }
-===== /Users/arun-joy.joseph/IdeaProjects/transfer-market/src/main/java/org/acme/TransferResource.java =====
+
+=====org/acme/TransferResource.java=====
+
+
 package org.acme;
 
 import org.acme.dto.TransferRequest;                 // input DTO
@@ -616,22 +476,25 @@ import jakarta.ws.rs.*;                                          // JAX-RS annot
 import jakarta.ws.rs.core.MediaType;                             // JSON
 import jakarta.ws.rs.core.Response;                              // HTTP responses
 
-@Path("/transfers")                                              // base path for transfers
+@Path("/transfers")
 @Consumes(MediaType.APPLICATION_JSON)
 @Produces(MediaType.APPLICATION_JSON)
 @Blocking
 public class TransferResource {
 
-    @Inject                                                      // inject our business service
+    @Inject
     TransferService service;
 
-    @POST                                                        // POST /transfers
-    public Response transfer(TransferRequest req) {              // JSON -> DTO
-        TransferResult result = service.transfer(req.buyerClubId, req.playerId);  // do it
-        return Response.ok(result).build();                      // 200 with result JSON
+    @POST
+    public Response transfer(TransferRequest req) {
+        TransferResult result = service.transfer(req.buyerClubId, req.playerId);
+        return Response.ok(result).build();
     }
 }
-===== /Users/arun-joy.joseph/IdeaProjects/transfer-market/src/main/java/org/acme/Club.java =====
+
+=====org/acme/Club.java=====
+
+
 package org.acme;
 
 import io.quarkus.hibernate.orm.panache.PanacheEntity;
@@ -639,8 +502,8 @@ import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.util.List;
 
-@Entity                                                      // Marks this as a JPA entity (mapped to a table)
-public class Club extends PanacheEntity {                    // Extends PanacheEntity => gets a Long id and helpers
+@Entity
+public class Club extends PanacheEntity {
 
     @Column(nullable = false, unique = true)
     public String name;
@@ -648,12 +511,15 @@ public class Club extends PanacheEntity {                    // Extends PanacheE
     @Column(nullable = false, precision = 19, scale = 2)
     public BigDecimal budget;
 
-    @OneToMany(mappedBy = "club",                            // players reference their club; 'club' is the owner side
-            cascade = CascadeType.ALL,                    // propagate saves/deletes to players
-            orphanRemoval = true)                         // remove players if they’re de-linked
-    public List<Player> players;                             // list of players for this club
+    @OneToMany(mappedBy = "club",
+            cascade = CascadeType.ALL,
+            orphanRemoval = true)
+    public List<Player> players;
 }
-===== /Users/arun-joy.joseph/IdeaProjects/transfer-market/src/main/java/org/acme/GenericExceptionMapper.java =====
+
+=====org/acme/GenericExceptionMapper.java=====
+
+
 package org.acme;
 
 import jakarta.ws.rs.ext.ExceptionMapper;
@@ -692,4 +558,5 @@ public class GenericExceptionMapper implements ExceptionMapper<Throwable> {
         }
     }
 }
+
 
