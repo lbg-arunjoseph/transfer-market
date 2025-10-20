@@ -559,4 +559,54 @@ public class GenericExceptionMapper implements ExceptionMapper<Throwable> {
     }
 }
 
+====resources/application.properties====
+
+# CORS (current key)
+quarkus.http.cors.enabled=true
+
+# H2 datasource
+quarkus.datasource.db-kind=h2
+quarkus.datasource.jdbc.url=jdbc:h2:mem:transferdb;DB_CLOSE_DELAY=-1
+quarkus.datasource.username=sa
+quarkus.datasource.password=sa
+
+# DDL (use the key your version recognizes)
+quarkus.hibernate-orm.database.generation=drop-and-create
+
+# Logging keys
+quarkus.hibernate-orm.log.sql=true
+quarkus.hibernate-orm.log.format-sql=true
+
+# Seed in dev/main only (tests override it to 'no-file')
+quarkus.hibernate-orm.sql-load-script=import.sql
+
+# Ollama
+ollama.base-url=http://localhost:11434
+ollama.model=mistral:latest
+
+# Optional: timeouts (ms)
+ollama.connect-timeout=5000
+ollama.read-timeout=30000
+
+====resources/import.sql====
+
+-- Clubs
+INSERT INTO Club(id, name, budget) VALUES (1, 'Arandale FC', 100000000.00);
+INSERT INTO Club(id, name, budget) VALUES (2, 'Bristol Rovers 2.0', 45000000.00);
+INSERT INTO Club(id, name, budget) VALUES (3, 'Manchester United', 200000000.00);
+INSERT INTO Club(id, name, budget) VALUES (4, 'Chelsea FC', 180000000.00);
+INSERT INTO Club(id, name, budget) VALUES (5, 'FC Barcelona', 220000000.00);
+
+ALTER SEQUENCE Club_SEQ RESTART WITH 6;
+
+-- Players
+INSERT INTO Player(id, name, price, club_id) VALUES (1, 'Luis Bento', 30000000.00, 1);
+INSERT INTO Player(id, name, price, club_id) VALUES (2, 'Marco Silva', 60000000.00, 1);
+INSERT INTO Player(id, name, price, club_id) VALUES (3, 'Cristiano Ronaldo', 90000000.00, 3);
+INSERT INTO Player(id, name, price, club_id) VALUES (4, 'Marcus Rashford', 70000000.00, 3);
+INSERT INTO Player(id, name, price, club_id) VALUES (5, 'Mason Mount', 60000000.00, 4);
+INSERT INTO Player(id, name, price, club_id) VALUES (6, 'Raheem Sterling', 65000000.00, 4);
+INSERT INTO Player(id, name, price, club_id) VALUES (7, 'Robert Lewandowski', 85000000.00, 5);
+INSERT INTO Player(id, name, price, club_id) VALUES (8, 'Pedri', 75000000.00, 5);
+
 
