@@ -50,6 +50,131 @@ public class TransferResult {
     public BigDecimal sellerBudgetAfter;
 }
 
+=====org/acme/chat/ChatResource.java=====
+
+
+package org.acme.chat;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.inject.Inject;
+import jakarta.transaction.Transactional;
+import jakarta.ws.rs.*;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
+import org.acme.chat.ChatDtos.*;
+
+import static org.acme.chat.Prompts.schemaCard;
+import static org.acme.chat.Prompts.verbaliseCard;
+
+@Path("/chat")
+@Consumes(MediaType.APPLICATION_JSON)
+@Produces(MediaType.APPLICATION_JSON)
+public class ChatResource {
+
+    @Inject
+    OllamaClient llm;
+
+    @Inject
+    SqlRunner sqlRunner;
+
+    @Inject
+    ObjectMapper mapper;
+
+    @POST
+    @Transactional(Transactional.TxType.REQUIRED) // read-only work fits in a tx for consistency
+    public Response chat(ChatRequest req) {
+        if (req == null || req.question == null || req.question.isBlank()) {
+            throw new BadRequestException("question is required");
+        }
+
+        try {
+            // Step 1: get plan (sql or final)
+            String planJson = llm.chat(schemaCard(), req.question.trim());
+
+            LlmPlan plan = mapper.readValue(planJson, LlmPlan.class);
+            if (plan.type == null) throw new WebApplicationException("Model returned an invalid plan", 502);
+
+            if ("final".equalsIgnoreCase(plan.type)) {
+                var out = new ChatResponse();
+                out.answer = plan.answer == null ? "(no answer)" : plan.answer;
+                out.usedSql = false;
+                return Response.ok(out).build();
+            }
+
+            if (!"sql".equalsIgnoreCase(plan.type) || plan.sql == null || plan.sql.isBlank()) {
+                throw new WebApplicationException("Model did not return a SQL plan", 502);
+            }
+
+            // Guardrails and run
+            sqlRunner.validateReadOnly(plan.sql);
+            String safeSql = sqlRunner.enforceLimit(plan.sql);
+            var rows = sqlRunner.runNative(safeSql);
+
+            // Step 2: verbalise results
+            String verbaliseUserMsg = "Question: " + req.question.trim() + "\n"
+                    + "Columns: " + mapper.writeValueAsString(rows.columns) + "\n"
+                    + "Rows: " + mapper.writeValueAsString(rows.rows);
+
+            String finalJson = llm.chat(verbaliseCard(), verbaliseUserMsg);
+            LlmPlan finalPlan = mapper.readValue(finalJson, LlmPlan.class);
+            if (!"final".equalsIgnoreCase(finalPlan.type)) {
+                throw new WebApplicationException("Model did not return a final answer", 502);
+            }
+
+            var out = new ChatResponse();
+            out.answer = finalPlan.answer;
+            out.usedSql = true;
+            out.sql = safeSql;
+            out.rows = rows;
+            return Response.ok(out).build();
+
+        } catch (Exception e) {
+            var out = new ChatResponse();
+            out.error = e.getMessage();
+            return Response.status(Response.Status.BAD_GATEWAY).entity(out).build();
+        }
+    }
+}
+
+=====org/acme/chat/Prompts.java=====
+
+
+package org.acme.chat;
+
+public class Prompts {
+
+    public static String schemaCard() {
+        return String.join("\n",
+                "You are a helpful data assistant for a football transfer app.",
+                "You can only produce JSON with this schema: {\"type\":\"sql\",\"sql\":\"...\"} OR {\"type\":\"final\",\"answer\":\"...\"}.",
+                "Never include any extra text outside JSON.",
+                "",
+                "Database schema (H2):",
+                "Table Club columns: id BIGINT, name VARCHAR, budget DECIMAL(19,2)",
+                "Table Player columns: id BIGINT, name VARCHAR, price DECIMAL(19,2), club_id BIGINT",
+                "Join rule: Player.club_id = Club.id",
+                "",
+                "Rules:",
+                "- Only produce read-only SELECT queries. Never modify data.",
+                "- Prefer case-insensitive name matching using UPPER(name) LIKE UPPER('%TERM%').",
+                "- If the user asks for counts, use COUNT(*).",
+                "- Use simple SQL that H2 supports.",
+                "- Keep queries small; avoid selecting too many columns when not needed.",
+                "- If the user question is already directly answerable without SQL, return {\"type\":\"final\",\"answer\":\"...\"}.",
+                "- Otherwise return {\"type\":\"sql\",\"sql\":\"...\"}.",
+                ""
+        );
+    }
+
+    public static String verbaliseCard() {
+        return String.join("\n",
+                "You are turning SQL result rows into a single concise natural-language answer.",
+                "Only produce JSON with {\"type\":\"final\",\"answer\":\"...\"}. No extra text.",
+                "If there are no rows, say that nothing was found.",
+                "If the question was for a list, join items with commas in a single sentence."
+        );
+    }
+}
 
 =====org/acme/chat/SqlRunner.java=====
 
@@ -182,6 +307,154 @@ public class SqlRunner {
     }
 }
 
+=====org/acme/chat/OllamaClient.java=====
+
+
+package org.acme.chat;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
+
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
+import java.util.List;
+
+import static org.acme.chat.ChatDtos.*;
+
+@ApplicationScoped
+public class OllamaClient {
+
+    @ConfigProperty(name = "ollama.base-url", defaultValue = "http://localhost:11434")
+    String baseUrl;
+
+    @ConfigProperty(name = "ollama.model", defaultValue = "mistral:latest")
+    String model;
+
+    @ConfigProperty(name = "ollama.connect-timeout", defaultValue = "5000")
+    int connectTimeoutMs;
+
+    @ConfigProperty(name = "ollama.read-timeout", defaultValue = "30000")
+    int readTimeoutMs;
+
+    @Inject
+    ObjectMapper mapper;
+
+    HttpClient client;
+
+    void ensureClient() {
+        if (client == null) {
+            client = HttpClient.newBuilder()
+                    .connectTimeout(Duration.ofMillis(connectTimeoutMs))
+                    .build();
+        }
+    }
+
+    public String chat(String systemPrompt, String userPrompt) throws Exception {
+        ensureClient();
+
+        var req = new OllamaChatRequest();
+        req.model = model;
+        req.stream = false;
+        req.messages = List.of(
+                new OllamaMessage("system", systemPrompt),
+                new OllamaMessage("user", userPrompt)
+        );
+
+        var body = mapper.writeValueAsString(req);
+
+        var httpReq = HttpRequest.newBuilder()
+                .uri(URI.create(baseUrl + "/api/chat"))
+                .timeout(Duration.ofMillis(readTimeoutMs))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(body))
+                .build();
+
+        var resp = client.send(httpReq, HttpResponse.BodyHandlers.ofString());
+        if (resp.statusCode() >= 300) {
+            throw new RuntimeException("Ollama error: HTTP " + resp.statusCode() + " body=" + resp.body());
+        }
+
+        // Ollama returns: {"message":{"role":"assistant","content":"..."},"done":true,...}
+        var node = (ObjectNode) mapper.readTree(resp.body());
+        var msg = node.path("message").path("content").asText(null);
+        if (msg == null) {
+            // Fallback older shapes
+            msg = node.path("content").asText(null);
+        }
+        if (msg == null) {
+            throw new RuntimeException("Could not parse Ollama response message");
+        }
+        return msg;
+    }
+}
+
+=====org/acme/chat/ChatDtos.java=====
+
+
+package org.acme.chat;
+
+import java.util.List;
+import java.util.Map;
+
+public class ChatDtos {
+
+    public static class ChatRequest {
+        public String question;
+    }
+
+    public static class ChatResponse {
+        public String answer;
+        public boolean usedSql;
+        public String sql;           // optional, for debugging
+        public Object rows;          // optional, echo rows we used
+        public String error;         // optional
+    }
+
+    // Internal DTOs to talk to Ollama /api/chat
+    public static class OllamaMessage {
+        public String role;
+        public String content;
+        public OllamaMessage() {}
+        public OllamaMessage(String role, String content) { this.role = role; this.content = content; }
+    }
+
+    public static class OllamaChatRequest {
+        public String model;
+        public List<OllamaMessage> messages;
+        public boolean stream = false;
+        public Map<String,Object> options; // optional tuning
+    }
+
+    public static class OllamaChatResponse {
+        public String model;
+        public String created_at;
+        public List<Choice> message; // NOTE: Ollama returns a single message object in newer APIs; we’ll parse content safely
+        public String done_reason;
+        public boolean done;
+        // We only need the assistant message content; to be robust, we'll map a minimal structure:
+        public AssistantMessage messageObj;
+        public static class Choice { public String content; }
+        public static class AssistantMessage { public String role; public String content; }
+    }
+
+    // The strict JSON the model should return to us
+    public static class LlmPlan {
+        public String type;  // "sql" or "final"
+        public String sql;
+        public String answer;
+    }
+
+    public static class SqlResultForLlm {
+        public List<String> columns;
+        public List<List<Object>> rows;
+    }
+}
 
 =====org/acme/chat/SqlResource.java=====
 
